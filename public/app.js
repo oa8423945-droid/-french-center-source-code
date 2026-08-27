@@ -880,10 +880,10 @@ function installAccountsUI() {
   const accountActions = document.createElement('div');
   accountActions.className = 'account-page-actions';
   $('#addManualAccountButton').replaceWith(accountActions);
-  accountActions.innerHTML = '<button id="addManualAccountButton" class="primary" type="button">＋ تسجيل حركة</button><button id="financialSummariesButton" class="primary" type="button">ملخصات مالية</button>';
+  accountActions.innerHTML = '<button id="addManualAccountButton" class="primary" type="button">＋ تسجيل حركة</button>';
   const summaries = document.createElement('div');
   summaries.id = 'financialSummariesView'; summaries.className = 'hidden';
-  summaries.innerHTML = `<div class="financial-summary-head"><button id="financialSummaryBack" class="back-btn" type="button">→ رجوع للحسابات</button><div><h1>الملخصات المالية</h1><p id="financialRangeLabel">ملخص الوضع المالي الحالي.</p></div><label>التاريخ المرجعي<input id="financialSummaryDate" type="date"></label></div><div class="financial-period-tabs main-period-tabs"><button class="active" data-financial-period="daily">يومي</button><button data-financial-period="weekly">أسبوعي</button><button data-financial-period="monthly">شهري</button><button data-financial-period="quarterly">ربع سنوي</button><button data-financial-period="halfyear">نصف سنوي</button><button data-financial-period="yearly">سنوي</button></div><div class="financial-export-actions"><button id="dailyClosingButton" class="secondary" type="button">قفل اليومية</button><button id="accountStatementButton" class="secondary" type="button">كشف حساب</button><button id="supplierDebtsButton" class="secondary" type="button">ديون الموردين</button></div><div id="financialSummaryContent"></div><div id="dailyClosingView" class="hidden"></div><div id="accountStatementView" class="hidden"></div><div id="supplierDebtsView" class="hidden"></div>`;
+  summaries.innerHTML = `<div class="financial-summary-head"><button id="financialSummaryBack" class="back-btn" type="button">→ رجوع للحسابات</button><div><h1>الملخصات المالية</h1><p id="financialRangeLabel">ملخص الوضع المالي الحالي.</p></div><label>التاريخ المرجعي<input id="financialSummaryDate" type="date"></label></div><div class="financial-period-tabs main-period-tabs"><button class="active" data-financial-period="daily">يومي</button><button data-financial-period="weekly">أسبوعي</button><button data-financial-period="monthly">شهري</button><button data-financial-period="quarterly">ربع سنوي</button><button data-financial-period="halfyear">نصف سنوي</button><button data-financial-period="yearly">سنوي</button></div><div class="financial-export-actions hidden"><button id="dailyClosingButton" class="secondary" type="button">قفل اليومية</button><button id="accountStatementButton" class="secondary" type="button">كشف حساب</button><button id="supplierDebtsButton" class="secondary" type="button">ديون الموردين</button></div><div id="financialSummaryContent"></div><div id="dailyClosingView" class="hidden"></div><div id="accountStatementView" class="hidden"></div><div id="supplierDebtsView" class="hidden"></div>`;
   page.appendChild(summaries);
   const dialog = document.createElement('dialog');
   dialog.id = 'manualAccountDialog';
@@ -894,7 +894,6 @@ function installAccountsUI() {
   $('#accountTypeOptions').insertAdjacentHTML('beforeend', '<option value="سلفة موظف"><option value="سداد سلفة موظف"><option value="سداد مديونية عميل"><option value="سداد مستحقات للمورد"><option value="دفع مستحق موظف"><option value="مصروفات نقدية">');
   dialog.querySelector('.dialog-close').addEventListener('click', () => dialog.close());
   $('#addManualAccountButton').addEventListener('click', openManualAccount);
-  $('#financialSummariesButton').addEventListener('click', openFinancialSummaries);
   $('#financialSummaryBack').addEventListener('click', closeFinancialSummaries);
   $('#financialSummaryDate').addEventListener('change', renderFinancialSummaries);
   $$('#financialSummariesView [data-financial-period]').forEach((button) => button.addEventListener('click', () => { financialPeriod = button.dataset.financialPeriod; dailyClosingVisible = false; $$('#financialSummariesView [data-financial-period]').forEach((item) => item.classList.toggle('active', item === button)); renderFinancialSummaries(); }));
@@ -926,13 +925,33 @@ function installAccountsUI() {
   debtDialog.querySelector('.dialog-close').addEventListener('click', () => debtDialog.close());
 }
 
+function mountReportsFinancialSummary() {
+  const mount = $('#reportsFinancialMount');
+  const summaries = $('#financialSummariesView');
+  if (!mount || !summaries) return;
+  mount.appendChild(summaries);
+  summaries.classList.remove('hidden');
+  const back = $('#financialSummaryBack');
+  if (back && !back.dataset.reportsBack) {
+    const clone = back.cloneNode(true);
+    clone.dataset.reportsBack = '1';
+    clone.textContent = '→ رجوع للتقارير';
+    clone.addEventListener('click', () => renderReports('accounts'));
+    back.replaceWith(clone);
+  }
+  $('#financialSummariesView .financial-export-actions')?.classList.add('hidden');
+}
+
 function openFinancialReport(report) {
-  go('accounts');
-  openFinancialSummaries();
+  if (!$('main #reports')?.classList.contains('active')) go('reports');
+  if (!$('#reportsFinancialMount')) renderReports('accounts');
+  mountReportsFinancialSummary();
   dailyClosingVisible = report === 'daily';
   supplierDebtsVisible = report === 'supplierDebts';
   $('#accountStatementView').classList.toggle('hidden', report !== 'statement');
+  $('#inventoryAuditView')?.classList.add('hidden');
   if (report === 'statement') statementPeriod = 'daily';
+  $$('#reportsContent [data-report]').forEach((button) => button.classList.toggle('active', button.dataset.report === report));
   renderFinancialSummaries();
   $('#financialSummariesView').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -949,15 +968,37 @@ function installReportsUI() {
   nav.addEventListener('click', () => go('reports'));
 }
 
-function renderReports() {
+function renderReports(section = 'home') {
+  const summaries = $('#financialSummariesView');
+  if (summaries && $('#reportsContent')?.contains(summaries)) {
+    summaries.classList.add('hidden');
+    $('#accounts')?.appendChild(summaries);
+  }
   const productCount = state.inventory.length;
-  $('#reportsContent').innerHTML = `<div class="reports-grid"><button class="report-card" type="button" data-report="daily"><span>▤</span><b>قفل اليومية</b><small>ملخص الوارد والصادر وقطع الغيار المستخدمة.</small></button><button class="report-card" type="button" data-report="statement"><span>☷</span><b>كشف الحساب</b><small>كل الحركات المالية مع الرصيد بعد كل عملية.</small></button><button class="report-card" type="button" data-report="supplierDebts"><span>₪</span><b>ديون الموردين</b><small>المدفوع والمتبقي لكل مورد.</small></button><button class="report-card" type="button" data-report="externalDebts"><span>◉</span><b>الديون الخارجية للمركز</b><small>المبالغ المستحقة على العملاء والموظفين والجهات الأخرى.</small></button><button class="report-card" type="button" data-report="inventory"><span>▦</span><b>جرد المخزن</b><small>${fmt(productCount)} صنف مختلف وقيمة المخزون الحالية.</small></button><button class="report-card" type="button" data-report="inventoryMovements"><span>↕</span><b>جرد حركة المخزن</b><small>الصادر والوارد بالكميات والأكواد والتاريخ والمبلغ.</small></button></div><div id="inventoryAuditView" class="financial-report-section hidden"></div>`;
+  const sectionCards = `<div class="reports-grid report-main-grid"><button class="report-card report-section-card" type="button" data-report-section="accounts"><span>ج</span><b>قسم الحسابات</b><small>قفل اليومية، كشف الحساب، ديون الموردين، والديون الخارجية للمركز.</small></button><button class="report-card report-section-card" type="button" data-report-section="customers"><span>ع</span><b>بيانات العملاء</b><small>تقارير وسجلات العملاء هتتضاف هنا حسب المطلوب القادم.</small></button><button class="report-card report-section-card" type="button" data-report-section="inventory"><span>▦</span><b>المخزن</b><small>جرد المخزن الحالي وجرد حركة الصادر والوارد.</small></button><button class="report-card report-section-card" type="button" data-report-section="employees"><span>♟</span><b>الموظفين</b><small>تقارير الموظفين والمرتبات والسلف هتتضاف هنا.</small></button></div>`;
+  const sectionViews = {
+    home: sectionCards,
+    accounts: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">التقارير المالية</span><h2>قسم الحسابات</h2><p>اختار التقرير المطلوب وسيظهر هنا داخل قسم التقارير.</p></div></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div><div id="reportsFinancialMount"></div>`,
+    customers: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير العملاء</span><h2>بيانات العملاء</h2><p>هنا هنضيف تقارير العملاء لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
+    inventory: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير المخزن</span><h2>المخزن</h2><p>اختار الجرد المطلوب وسيظهر داخل التقارير.</p></div></div><div class="report-action-tabs"><button type="button" data-report="inventory">جرد المخزن</button><button type="button" data-report="inventoryMovements">جرد حركة المخزن</button></div>`,
+    employees: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير الموظفين</span><h2>الموظفين</h2><p>هنا هنضيف تقارير الموظفين لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
+  };
+  $('#reportsContent').innerHTML = `<div id="reportsSectionContent">${sectionViews[section] || sectionCards}</div><div id="inventoryAuditView" class="financial-report-section hidden"></div>`;
+  $$('#reportsContent [data-report-section]').forEach((button) => button.addEventListener('click', () => renderReports(button.dataset.reportSection)));
   $$('#reportsContent [data-report]').forEach((button) => button.addEventListener('click', () => {
+    $$('#reportsContent [data-report]').forEach((item) => item.classList.toggle('active', item === button));
     if (button.dataset.report === 'inventory') return openInventoryAuditReport();
     if (button.dataset.report === 'inventoryMovements') return openInventoryMovementsReport();
     if (button.dataset.report === 'externalDebts') return openExternalDebtsReport();
     openFinancialReport(button.dataset.report);
   }));
+  if (section === 'accounts') {
+    mountReportsFinancialSummary();
+    dailyClosingVisible = false;
+    supplierDebtsVisible = false;
+    $('#accountStatementView')?.classList.add('hidden');
+    renderFinancialSummaries();
+  }
 }
 
 function openInventoryMovementsReportLegacy() {
@@ -1070,8 +1111,9 @@ function renderFinancialSummaries() {
   $('#financialRangeLabel').textContent = `${range.title}: من ${range.from} إلى ${range.to}`;
   const centerDebt = state.suppliers.reduce((sum, supplier) => sum + Number(supplier.due || 0), 0) + state.customers.reduce((sum, customer) => sum + Number(customer.dueFromCenter || 0), 0) + state.employees.reduce((sum, employee) => sum + Number(employee.dueToEmployee || 0), 0);
   const othersDebt = state.customers.reduce((sum, customer) => sum + Number(customer.dueFromCustomer || 0), 0) + state.employees.reduce((sum, employee) => sum + Number(employee.debtOnEmployee || 0), 0);
-  $('#financialSummaryContent').innerHTML = `<div class="financial-summary-cards"><button type="button" class="treasury-card"><small>رصيد الخزنة الحالي</small><strong>${fmt(currentBalance)} ج</strong><span>وارد الفترة ${fmt(incoming)} ج · صادر الفترة ${fmt(outgoing)} ج</span></button><div><small>إجمالي الوارد</small><strong>${fmt(incoming)} ج</strong></div><div><small>إجمالي المصروف</small><strong>${fmt(outgoing)} ج</strong></div><div><small>صافي الدخل</small><strong>${fmt(incoming - outgoing)} ج</strong></div><button id="debtSummaryCard" type="button" class="treasury-card debt-summary-card"><small>المديونية</small><strong>${fmt(centerDebt + othersDebt)} ج</strong><span>على المركز ${fmt(centerDebt)} ج · على الغير ${fmt(othersDebt)} ج</span></button></div>`;
-  $('#debtSummaryCard').addEventListener('click', () => openDebtDialog('center'));
+  $('#financialSummaryContent').innerHTML = `<div class="financial-summary-cards"><button type="button" class="treasury-card"><small>رصيد الخزنة الحالي</small><strong>${fmt(currentBalance)} ج</strong><span>وارد الفترة ${fmt(incoming)} ج · صادر الفترة ${fmt(outgoing)} ج</span></button><div><small>إجمالي الوارد</small><strong>${fmt(incoming)} ج</strong></div><div><small>إجمالي المصروف</small><strong>${fmt(outgoing)} ج</strong></div><div><small>صافي الدخل</small><strong>${fmt(incoming - outgoing)} ج</strong></div><button id="centerDebtSummaryCard" type="button" class="treasury-card debt-summary-card debt-payable"><small>مديونية على المركز</small><strong>${fmt(centerDebt)} ج</strong><span>المبالغ المطلوبة من المركز للموردين والعملاء والموظفين</span></button><button id="othersDebtSummaryCard" type="button" class="treasury-card debt-summary-card debt-receivable"><small>مديونية على الغير</small><strong>${fmt(othersDebt)} ج</strong><span>المبالغ المطلوبة للمركز من العملاء والموظفين</span></button></div>`;
+  $('#centerDebtSummaryCard').addEventListener('click', () => openDebtDialog('center'));
+  $('#othersDebtSummaryCard').addEventListener('click', () => openDebtDialog('others'));
   $('#dailyClosingButton').textContent = dailyClosingVisible ? 'إغلاق قفل اليومية' : 'قفل اليومية';
   $('#dailyClosingView').classList.toggle('hidden', !dailyClosingVisible);
   $('#dailyClosingView').innerHTML = `<div class="daily-closing-title"><div><h2>قفل اليومية — ${range.from}</h2><p>تفاصيل حركة اليوم كاملة.</p></div><details class="download-menu daily-closing-download"><summary>تنزيل</summary><div><a href="${financialPdfUrl}" target="_blank">تنزيل PDF</a><a href="${financialExcelUrl}" download>تنزيل Excel</a></div></details></div>
@@ -1412,3 +1454,4 @@ $('#inventoryForm').addEventListener('submit', async (event) => {
 
 $('#today').textContent = new Intl.DateTimeFormat('ar-EG', { dateStyle: 'full' }).format(new Date());
 load();
+
