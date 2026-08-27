@@ -932,6 +932,7 @@ function mountReportsFinancialSummary() {
   if (!mount || !summaries) return;
   mount.appendChild(summaries);
   summaries.classList.remove('hidden');
+  summaries.classList.add('reports-mounted-summary');
   const back = $('#financialSummaryBack');
   if (back && !back.dataset.reportsBack) {
     const clone = back.cloneNode(true);
@@ -981,13 +982,14 @@ function renderReports(section = 'home') {
   const summaries = $('#financialSummariesView');
   if (summaries && $('#reportsContent')?.contains(summaries)) {
     summaries.classList.add('hidden');
+    summaries.classList.remove('reports-mounted-summary');
     $('#accounts')?.appendChild(summaries);
   }
   const productCount = state.inventory.length;
   const sectionCards = `<div class="reports-grid report-main-grid"><button class="report-card report-section-card" type="button" data-report-section="accounts"><span>ج</span><b>قسم الحسابات</b><small>قفل اليومية، كشف الحساب، ديون الموردين، والديون الخارجية للمركز.</small></button><button class="report-card report-section-card" type="button" data-report-section="customers"><span>ع</span><b>بيانات العملاء</b><small>تقارير وسجلات العملاء هتتضاف هنا حسب المطلوب القادم.</small></button><button class="report-card report-section-card" type="button" data-report-section="inventory"><span>▦</span><b>المخزن</b><small>جرد المخزن الحالي وجرد حركة الصادر والوارد.</small></button><button class="report-card report-section-card" type="button" data-report-section="employees"><span>♟</span><b>الموظفين</b><small>تقارير الموظفين والمرتبات والسلف هتتضاف هنا.</small></button></div>`;
   const sectionViews = {
     home: sectionCards,
-    accounts: `<div class="reports-subpage-head reports-financial-head"><div><span class="eyebrow">التقارير</span><h2>التقارير المالية</h2><p>اختار التقرير المطلوب لعرض بياناته.</p></div><button class="back-btn" type="button" data-report-section="home">→ رجوع</button></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div><div id="reportsFinancialMount"></div>`,
+    accounts: `<div class="reports-subpage-head reports-financial-head"><div><span class="eyebrow">التقارير</span><h2>التقارير المالية</h2><p>اختار التقرير المطلوب لعرض بياناته.</p></div><button class="back-btn" type="button" data-report-section="home">→ رجوع</button></div><div id="reportsFinancialMount"></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div>`,
     customers: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير العملاء</span><h2>بيانات العملاء</h2><p>هنا هنضيف تقارير العملاء لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
     inventory: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير المخزن</span><h2>المخزن</h2><p>اختار الجرد المطلوب وسيظهر داخل التقارير.</p></div></div><div class="report-action-tabs"><button type="button" data-report="inventory">جرد المخزن</button><button type="button" data-report="inventoryMovements">جرد حركة المخزن</button></div>`,
     employees: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير الموظفين</span><h2>الموظفين</h2><p>هنا هنضيف تقارير الموظفين لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
