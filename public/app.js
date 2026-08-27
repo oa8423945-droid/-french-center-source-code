@@ -774,11 +774,16 @@ function showSupplierDetails(code) {
   if (!supplier) return;
   const accounts = state.accounts.filter((account) => account.supplierCode === supplier.code || account.supplierName === supplier.name);
   const detail = (label, value) => `<div><small>${label}</small><b>${esc(value)}</b></div>`;
-  const rows = [...accounts].reverse().map((account) => `<tr><td><b>${esc(account.code)}</b></td><td>${esc(account.date || '—')}</td><td>${esc(account.type)}</td><td>${esc(account.productName || '—')}</td><td>${fmt(account.total)} ج</td><td>${fmt(account.paid)} ج</td><td>${fmt(account.due)} ج</td></tr>`).join('');
+  const rows = [...accounts].reverse().map((account) => `<tr class="supplier-account-row" data-account-code="${esc(account.code)}" tabindex="0"><td><b>${esc(account.code)}</b></td><td>${esc(account.date || '—')}</td><td>${esc(account.type)}</td><td>${esc(account.productName || '—')}</td><td>${fmt(account.total)} ج</td><td>${fmt(account.paid)} ج</td><td>${fmt(account.due)} ج</td></tr>`).join('');
   $('#supplierDetailsContent').innerHTML = `<div class="dialog-title"><span>♧</span><div><h2>${esc(supplier.name)}</h2><p>${esc(supplier.code)}</p></div></div>
     <div class="supplier-summary-grid">${detail('كود المورد', supplier.code)}${detail('رقم التليفون', supplier.phone || '—')}${detail('تاريخ التعاقد', supplier.contractDate || 'غير مسجل')}${detail('إجمالي المدفوع', `${fmt(supplier.paid)} ج`)}${detail('إجمالي المستحق', `${fmt(supplier.due)} ج`)}${detail('آخر تاريخ دفع', supplier.paymentDate || '—')}</div>
     <div class="supplier-movements-title"><h3>الحركات المالية</h3><p>${fmt(accounts.length)} حركة مسجلة</p></div>
     ${rows ? `<div class="table-wrap"><table><thead><tr><th>الكود</th><th>التاريخ</th><th>النوع</th><th>المنتج</th><th>الإجمالي</th><th>المدفوع</th><th>المستحق</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty-state">لا توجد حركات مالية مسجلة لهذا المورد بعد.</div>'}`;
+  $$('#supplierDetailsContent .supplier-account-row').forEach((row) => {
+    const openMovement = () => { $('#supplierDetailsDialog').close(); showAccountDetails(row.dataset.accountCode); };
+    row.addEventListener('click', openMovement);
+    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMovement(); } });
+  });
   $('#supplierDetailsDialog').showModal();
 }
 
