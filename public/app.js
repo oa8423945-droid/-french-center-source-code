@@ -2,11 +2,41 @@ const state = { customers: [], visits: [], inventory: [], suppliers: [], employe
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const fmt = (value) => Number(value || 0).toLocaleString('ar-EG');
+const moneyInputSelector = 'input[name="labor"],input[name="paid"],input[name="amount"],input[name="buy"],input[name="sell"],input[name="weeklySalary"],input[id="inventoryDue"],input[id="transactionDue"],input.split-payment-amount';
+const moneyNumber = (value) => Number(String(value ?? '').replace(/,/g, '').trim()) || 0;
+function moneyInputText(value) {
+  let clean = String(value ?? '').replace(/,/g, '').replace(/[^0-9.]/g, '');
+  if (!clean) return '';
+  const point = clean.indexOf('.');
+  if (point >= 0) clean = clean.slice(0, point + 1) + clean.slice(point + 1).replace(/\./g, '');
+  const hasDecimal = clean.includes('.');
+  let [whole, decimal = ''] = clean.split('.');
+  whole = whole.replace(/^0+(?=\d)/, '') || '0';
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return hasDecimal ? `${grouped}.${decimal.slice(0, 2)}` : grouped;
+}
+function setMoneyInputValue(input, value) { if (input) input.value = moneyInputText(value); }
+function normalizeMoneyPayload(input) {
+  ['labor', 'paid', 'amount', 'buy', 'sell', 'weeklySalary'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(input, key) && input[key] !== '') input[key] = moneyNumber(input[key]);
+  });
+  return input;
+}
+function formPayload(form) { return normalizeMoneyPayload(Object.fromEntries(new FormData(form))); }
+function enableMoneyInputFormatting() {
+  $$(moneyInputSelector).forEach((input) => { input.type = 'text'; input.inputMode = 'decimal'; setMoneyInputValue(input, input.value); });
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!input.matches?.(moneyInputSelector)) return;
+    const formatted = moneyInputText(input.value);
+    if (input.value !== formatted) { input.value = formatted; input.setSelectionRange?.(formatted.length, formatted.length); }
+  }, true);
+}
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 const normalized = (value) => String(value || '').trim().replace(/[\s-]/g, '').toLocaleLowerCase('ar-EG');
 const codeKey = (value) => { const text = String(value || '').trim(); const match = text.match(/^([a-zA-Z])[-\s]*0*(\d+)$/); return match ? `${match[1].toUpperCase()}${Number(match[2])}` : normalized(text); };
 const paymentMethodOptions = (allowCredit = true) => (allowCredit ? ['نقدي', 'إنستاباي', 'فودافون كاش', 'تحويل بنكي', 'آجل'] : ['نقدي', 'إنستاباي', 'فودافون كاش', 'تحويل بنكي']).map((value) => `<option value="${value}">${value}</option>`).join('');
-function paymentRow(allowCredit = true) { return `<div class="split-payment-row"><select class="split-payment-method">${paymentMethodOptions(allowCredit)}</select><input class="split-payment-amount" type="number" min="0" step="0.01" placeholder="المبلغ"><button type="button" class="remove-split-payment" aria-label="حذف">×</button></div>`; }
+function paymentRow(allowCredit = true) { return `<div class="split-payment-row"><select class="split-payment-method">${paymentMethodOptions(allowCredit)}</select><input class="split-payment-amount" type="text" inputmode="decimal" placeholder="المبلغ"><button type="button" class="remove-split-payment" aria-label="حذف">×</button></div>`; }
 function installSplitPayment(form, paidFieldName = '', allowCredit = true) {
   if (!form || form.querySelector('.split-payment-editor')) return;
   const method = form.elements.paymentMethod;
@@ -26,8 +56,8 @@ function installSplitPayment(form, paidFieldName = '', allowCredit = true) {
 function bindSplitPaymentRows(editor) {
   const sync = () => {
     const form = editor.closest('form');
-    const paid = [...editor.querySelectorAll('.split-payment-row')].reduce((sum, row) => row.querySelector('.split-payment-method').value === 'آجل' ? sum : sum + (Number(row.querySelector('.split-payment-amount').value) || 0), 0);
-    if (form.elements.paid) form.elements.paid.value = paid;
+    const paid = [...editor.querySelectorAll('.split-payment-row')].reduce((sum, row) => row.querySelector('.split-payment-method').value === 'آجل' ? sum : sum + moneyNumber(row.querySelector('.split-payment-amount').value), 0);
+    if (form.elements.paid) setMoneyInputValue(form.elements.paid, paid);
     if (form.id === 'inventoryForm') calculateInventoryPurchase();
     if (form.id === 'supplierTransactionForm') calculateSupplierTransaction();
     if (form.id === 'visitForm') updateVisitPaymentTotal();
@@ -41,7 +71,8 @@ function resetSplitPayment(form) {
   if (rows) bindSplitPaymentRows(form.querySelector('.split-payment-editor'));
 }
 function addPaymentsToInput(input, form) {
-  input.payments = [...form.querySelectorAll('.split-payment-row')].map((row) => ({ method: row.querySelector('.split-payment-method').value, amount: Number(row.querySelector('.split-payment-amount').value) || 0 })).filter((entry) => entry.amount > 0);
+  normalizeMoneyPayload(input);
+  input.payments = [...form.querySelectorAll('.split-payment-row')].map((row) => ({ method: row.querySelector('.split-payment-method').value, amount: moneyNumber(row.querySelector('.split-payment-amount').value) })).filter((entry) => entry.amount > 0);
   if (!input.payments.length) throw new Error('اختر طريقة الدفع واكتب المبلغ قبل الحفظ. استخدم آجل للمبلغ غير المدفوع.');
   input.paymentMethod = [...new Set(input.payments.map((entry) => entry.method))].join(' + ') || 'آجل';
   input.paid = input.payments.filter((entry) => entry.method !== 'آجل').reduce((sum, entry) => sum + entry.amount, 0);
@@ -319,14 +350,14 @@ function chooseInventoryMode(mode) {
 function calculateInventoryPurchase() {
   const form = $('#inventoryForm');
   const qty = Math.max(0, Number(form.elements.qty?.value) || 0);
-  const buy = Math.max(0, Number(form.elements.buy?.value) || 0);
-  const sell = Math.max(0, Number(form.elements.sell?.value) || 0);
-  const paid = Math.max(0, Number(form.elements.paid?.value) || 0);
+  const buy = Math.max(0, moneyNumber(form.elements.buy?.value));
+  const sell = Math.max(0, moneyNumber(form.elements.sell?.value));
+  const paid = Math.max(0, moneyNumber(form.elements.paid?.value));
   const total = qty * buy;
   const due = Math.max(0, total - paid);
   $('#inventoryPurchaseTotal').textContent = `${fmt(total)} ج`;
   $('#inventoryMargin').textContent = `${fmt(sell - buy)} ج`;
-  $('#inventoryDue').value = due;
+  setMoneyInputValue($('#inventoryDue'), due);
 }
 
 function renderProductSuggestions() {
@@ -346,8 +377,8 @@ function selectOldProduct(code) {
   if (!item) return;
   const form = $('#inventoryForm');
   form.elements.code.value = item.code;
-  form.elements.buy.value = item.buy;
-  form.elements.sell.value = item.sell;
+  setMoneyInputValue(form.elements.buy, item.buy);
+  setMoneyInputValue(form.elements.sell, item.sell);
   form.elements.supplier.value = item.supplier || '';
   $('#oldProductSearch').value = item.code;
   const selected = $('#selectedOldProduct');
@@ -608,7 +639,7 @@ function calculateVisitParts() {
 function updateVisitPaymentTotal() {
   const form = $('#visitForm'); const target = $('#visitPaymentTotal'); if (!form || !target) return;
   const parts = [...document.querySelectorAll('#visitPartsRows .part-entry')].reduce((sum, row) => { const item = state.inventory.find((entry) => entry.code === row.querySelector('.part-select').value); return sum + (item ? item.sell * Math.max(1, Math.floor(Number(row.querySelector('.part-qty').value) || 1)) : 0); }, 0);
-  target.textContent = `${fmt(parts + (Number(form.elements.labor?.value) || 0))} ج`;
+  target.textContent = `${fmt(parts + moneyNumber(form.elements.labor?.value))} ج`;
 }
 
 function installInventoryMovementUI() {
@@ -770,8 +801,8 @@ function selectProductTransactionValue() {
   if (!item) return;
   input.value = item.code;
   const form = $('#supplierTransactionForm');
-  form.elements.buy.value = item.buy;
-  form.elements.sell.value = item.sell;
+  setMoneyInputValue(form.elements.buy, item.buy);
+  setMoneyInputValue(form.elements.sell, item.sell);
   if (!form.elements.supplierCode.value && item.supplier) {
     const supplier = state.suppliers.find((entry) => entry.name === item.supplier);
     if (supplier) form.elements.supplierCode.value = supplier.code;
@@ -781,15 +812,15 @@ function selectProductTransactionValue() {
 
 function calculateSupplierTransaction() {
   const form = $('#supplierTransactionForm');
-  const total = (Number(form.elements.qty.value) || 0) * (Number(form.elements.buy.value) || 0);
-  const due = Math.max(0, total - (Number(form.elements.paid.value) || 0));
-  $('#transactionDue').value = due;
+  const total = (Number(form.elements.qty.value) || 0) * moneyNumber(form.elements.buy.value);
+  const due = Math.max(0, total - moneyNumber(form.elements.paid.value));
+  setMoneyInputValue($('#transactionDue'), due);
 }
 
 async function submitSupplierAdd(event) {
   event.preventDefault();
   try {
-    const supplier = await request('/api/suppliers', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+    const supplier = await request('/api/suppliers', { method: 'POST', body: JSON.stringify(formPayload(event.currentTarget)) });
     $('#supplierAddDialog').close();
     await load(); renderSuppliers(); toast(`تم إضافة المورد ${supplier.name} — الكود ${supplier.code}`);
   } catch (error) { toast(error.message, true); }
@@ -798,7 +829,7 @@ async function submitSupplierAdd(event) {
 async function submitSupplierTransaction(event) {
   event.preventDefault();
   try {
-    const input = addPaymentsToInput(Object.fromEntries(new FormData(event.currentTarget)), event.currentTarget);
+    const input = addPaymentsToInput(formPayload(event.currentTarget), event.currentTarget);
     const result = await request('/api/supplier-transactions', { method: 'POST', body: JSON.stringify(input) });
     $('#supplierTransactionDialog').close();
     await load(); renderSuppliers(); toast(`تم تسجيل الحركة ${result.account.code} بنجاح.`);
@@ -869,7 +900,7 @@ function openEmployeeStatusDialog(employee) {
 
 async function submitEmployeeStatus(event) {
   event.preventDefault();
-  try { const input = Object.fromEntries(new FormData(event.currentTarget)); await request('/api/employees/status', { method: 'POST', body: JSON.stringify(input) }); $('#employeeStatusDialog').close(); await load(); showStoppedEmployees(); toast('تم نقل الموظف إلى الموقوفين عن العمل.'); }
+  try { const input = formPayload(event.currentTarget); await request('/api/employees/status', { method: 'POST', body: JSON.stringify(input) }); $('#employeeStatusDialog').close(); await load(); showStoppedEmployees(); toast('تم نقل الموظف إلى الموقوفين عن العمل.'); }
   catch (error) { toast(error.message, true); }
 }
 
@@ -880,7 +911,7 @@ async function reactivateEmployee(code) {
 
 async function submitEmployee(event) {
   event.preventDefault();
-  try { const employee = await request('/api/employees', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); $('#employeeAddDialog').close(); await load(); renderEmployees(); toast(`تم إضافة الموظف ${employee.name} — ${employee.code}`); }
+  try { const employee = await request('/api/employees', { method: 'POST', body: JSON.stringify(formPayload(event.currentTarget)) }); $('#employeeAddDialog').close(); await load(); renderEmployees(); toast(`تم إضافة الموظف ${employee.name} — ${employee.code}`); }
   catch (error) { toast(error.message, true); }
 }
 
@@ -1308,9 +1339,9 @@ function selectManualEmployee() {
   if (!employee) return;
   form.elements.employeeCode.value = employee.code;
   if (form.elements.type.value === 'مرتبات') {
-    form.elements.amount.value = employee.weeklySalary || '';
+    setMoneyInputValue(form.elements.amount, employee.weeklySalary || '');
     const paymentAmount = form.querySelector('.split-payment-amount');
-    if (paymentAmount && !paymentAmount.value) paymentAmount.value = employee.weeklySalary || '';
+    if (paymentAmount && !paymentAmount.value) setMoneyInputValue(paymentAmount, employee.weeklySalary || '');
     if (!form.elements.description.value) form.elements.description.value = `مرتب أسبوعي — ${employee.name}`;
   }
   updateManualDebtHint();
@@ -1319,7 +1350,7 @@ function selectManualEmployee() {
 async function submitManualAccount(event) {
   event.preventDefault();
   try {
-    let input = Object.fromEntries(new FormData(event.currentTarget));
+    let input = formPayload(event.currentTarget);
     if (input.type === 'سلفة' && input.employeeCode) input.type = 'سلفة موظف';
     if (input.operation === 'دين' || input.type === 'مستحق لموظف') {
       input.payments = [{ method: 'آجل', amount: Number(input.amount) || 0 }];
@@ -1418,6 +1449,7 @@ installAccountsUI();
 installReportsUI();
 installProductDetailsUI();
 upgradeSearchableChoices();
+enableMoneyInputFormatting();
 installGlobalCodeSearch();
 
 $$('.nav-btn').forEach((button) => button.addEventListener('click', () => go(button.dataset.page)));
@@ -1451,7 +1483,7 @@ $('#customerForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   try {
-    const input = Object.fromEntries(new FormData(form));
+    const input = formPayload(form);
     const customer = await request('/api/customers', { method: 'POST', body: JSON.stringify(input) });
     state.customers.push(customer);
     state.selectedCustomer = customer;
@@ -1470,7 +1502,7 @@ $('#customerForm').addEventListener('submit', async (event) => {
 $('#visitForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
-    const input = addPaymentsToInput(Object.fromEntries(new FormData(event.currentTarget)), event.currentTarget);
+    const input = addPaymentsToInput(formPayload(event.currentTarget), event.currentTarget);
     input.customerCode = state.selectedCustomer.code;
     if (Number(input.labor) <= 0) throw new Error('يجب كتابة قيمة المصنعية قبل حفظ الزيارة.');
     input.parts = selectedVisitParts();
@@ -1490,7 +1522,7 @@ $('#inventoryForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
     const form = event.currentTarget;
-    const input = addPaymentsToInput(Object.fromEntries(new FormData(form)), form);
+    const input = addPaymentsToInput(formPayload(form), form);
     if (input.mode === 'old' && !input.code) throw new Error('اختر منتجًا قديمًا من نتائج البحث.');
     const result = await request('/api/inventory', { method: 'POST', body: JSON.stringify(input) });
     $('#inventoryDialog').close();
