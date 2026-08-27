@@ -963,7 +963,6 @@ function openFinancialReport(report) {
   if (report === 'statement') statementPeriod = 'daily';
   $$('#reportsContent [data-report]').forEach((button) => button.classList.toggle('active', button.dataset.report === report));
   renderFinancialSummaries();
-  $('#financialSummariesView').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function installReportsUI() {
@@ -1081,7 +1080,6 @@ function openExternalDebtsReport() {
   const view = $('#inventoryAuditView');
   view.classList.remove('hidden');
   view.innerHTML = `<div class="statement-head"><div><h2>الديون الخارجية للمركز</h2><p>كل الأموال المستحقة على العملاء والموظفين والجهات الخارجية.</p></div><details class="download-menu"><summary>تنزيل التقرير</summary><div><a href="/api/external-debts?format=pdf" download>تنزيل PDF</a><a href="/api/external-debts?format=xlsx" download>تنزيل Excel</a></div></details></div><div class="table-wrap"><table><thead><tr><th>الكود</th><th>البيان</th><th>المبلغ المطلوب</th></tr></thead><tbody>${rows.map((item) => `<tr><td><b>${esc(item.code)}</b></td><td>${esc(item.statement)}</td><td class="money-value">${fmt(item.amount)} ج</td></tr>`).join('') || '<tr><td colspan="3">لا توجد ديون خارجية مسجلة.</td></tr>'}<tr class="supplier-debt-total"><td><b>إجمالي الأشخاص: ${fmt(rows.length)}</b></td><td colspan="2"><b>إجمالي المبلغ المطلوب: ${fmt(total)} ج</b></td></tr></tbody></table></div>`;
-  view.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function toggleDownloadChoices(show) {
