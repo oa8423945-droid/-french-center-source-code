@@ -88,8 +88,12 @@ let supplierDebtsVisible = false;
 let activeFinancialReport = '';
 let inventoryAuditPeriod = 'current';
 let inventoryMovementPeriod = 'daily';
+let customerReportPeriod = 'daily';
+let activeCustomerReport = '';
+let customerReportCustomFrom = '';
+let customerReportCustomTo = '';
 
-function inventoryMovementRange(period) {
+function reportDateRange(period) {
   const end = new Date();
   const start = new Date(end);
   if (period === 'weekly') start.setDate(end.getDate() - 6);
@@ -99,6 +103,10 @@ function inventoryMovementRange(period) {
   else if (period === 'yearly') start.setMonth(0, 1);
   const iso = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   return { from: iso(start), to: iso(end) };
+}
+
+function inventoryMovementRange(period) {
+  return reportDateRange(period);
 }
 
 async function request(url, options) {
@@ -1081,17 +1089,29 @@ function renderReports(section = 'home') {
   const productCount = state.inventory.length;
   const inventoryValue = state.inventory.reduce((sum, item) => sum + ((Number(item.qty) || 0) * (Number(item.buy) || 0)), 0);
   const inventorySummaryCards = `<div class="financial-summary-cards inventory-report-summary"><div><small>عدد الأصناف بالمخزن</small><strong>${fmt(productCount)}</strong><span>إجمالي المنتجات المختلفة المسجلة</span></div><div class="treasury-card"><small>قيمة البضاعة بالمخزن</small><strong>${fmt(inventoryValue)} ج</strong><span>الكمية الحالية × سعر الشراء</span></div></div>`;
-  const sectionCards = `<div class="reports-grid report-main-grid"><button class="report-card report-section-card" type="button" data-report-section="accounts"><span>ج</span><b>قسم الحسابات</b><small>قفل اليومية، كشف الحساب، ديون الموردين، والديون الخارجية للمركز.</small></button><button class="report-card report-section-card" type="button" data-report-section="customers"><span>ع</span><b>بيانات العملاء</b><small>تقارير وسجلات العملاء هتتضاف هنا حسب المطلوب القادم.</small></button><button class="report-card report-section-card" type="button" data-report-section="inventory"><span>▦</span><b>المخزن</b><small>جرد المخزن الحالي وجرد حركة الصادر والوارد.</small></button><button class="report-card report-section-card" type="button" data-report-section="employees"><span>♟</span><b>الموظفين</b><small>تقارير الموظفين والمرتبات والسلف هتتضاف هنا.</small></button></div>`;
+  const sectionCards = `<div class="reports-grid report-main-grid"><button class="report-card report-section-card" type="button" data-report-section="accounts"><span>ج</span><b>قسم الحسابات</b><small>قفل اليومية، كشف الحساب، ديون الموردين، والديون الخارجية للمركز.</small></button><button class="report-card report-section-card" type="button" data-report-section="customers"><span>ع</span><b>بيانات العملاء</b><small>جرد العملاء وجرد الزيارات حسب الفترة مع تنزيل PDF أو Excel.</small></button><button class="report-card report-section-card" type="button" data-report-section="inventory"><span>▦</span><b>المخزن</b><small>جرد المخزن الحالي وجرد حركة الصادر والوارد.</small></button><button class="report-card report-section-card" type="button" data-report-section="employees"><span>♟</span><b>الموظفين</b><small>تقارير الموظفين والمرتبات والسلف هتتضاف هنا.</small></button></div>`;
   const sectionViews = {
     home: sectionCards,
     accounts: `<div class="reports-subpage-head reports-financial-head"><div><span class="eyebrow">التقارير</span><h2>التقارير المالية</h2><p>اختار التقرير المطلوب لعرض بياناته.</p></div><button class="back-btn" type="button" data-report-section="home">→ رجوع</button></div><div id="reportsFinancialMount"></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div>`,
-    customers: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير العملاء</span><h2>بيانات العملاء</h2><p>هنا هنضيف تقارير العملاء لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
+    customers: `<div class="reports-subpage-head reports-customers-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير العملاء</span><h2>بيانات العملاء</h2><p>اختر جرد العملاء أو جرد الزيارات، وحدد المدة المطلوبة.</p></div></div><div class="report-action-tabs customer-report-tabs"><button type="button" data-customer-report="customers">جرد العملاء</button><button type="button" data-customer-report="visits">جرد الزيارات</button></div><div id="customerAuditView" class="financial-report-section hidden"></div>`,
     inventory: `<div class="reports-subpage-head reports-inventory-head"><div><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><span class="eyebrow">تقارير المخزن</span><h2>المخزن</h2><p>اختار الجرد المطلوب وسيظهر داخل التقارير.</p></div></div>${inventorySummaryCards}<div class="report-action-tabs"><button type="button" data-report="inventory">جرد المخزن</button><button type="button" data-report="inventoryMovements">جرد حركة المخزن</button></div>`,
     employees: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير الموظفين</span><h2>الموظفين</h2><p>هنا هنضيف تقارير الموظفين لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
   };
   $('#reportsContent').innerHTML = `<div id="reportsSectionContent">${sectionViews[section] || sectionCards}</div><div id="inventoryAuditView" class="financial-report-section hidden"></div>`;
   $('#reports .page-title')?.classList.toggle('hidden', section !== 'home');
   $$('#reportsContent [data-report-section]').forEach((button) => button.addEventListener('click', () => renderReports(button.dataset.reportSection)));
+  $$('#reportsContent [data-customer-report]').forEach((button) => button.addEventListener('click', () => {
+    const report = button.dataset.customerReport;
+    if (activeCustomerReport === report && !$('#customerAuditView')?.classList.contains('hidden')) {
+      activeCustomerReport = '';
+      $('#customerAuditView').classList.add('hidden');
+    } else {
+      activeCustomerReport = report;
+      customerReportPeriod = 'daily';
+      openCustomerAuditReport(report);
+    }
+    $$('#reportsContent [data-customer-report]').forEach((item) => item.classList.toggle('active', item.dataset.customerReport === activeCustomerReport));
+  }));
   $$('#reportsContent [data-report]').forEach((button) => button.addEventListener('click', () => {
     $$('#reportsContent [data-report]').forEach((item) => item.classList.toggle('active', item === button));
     if (button.dataset.report === 'inventory') return openInventoryAuditReport();
@@ -1118,6 +1138,68 @@ function renderReports(section = 'home') {
     $('#accountStatementView')?.classList.add('hidden');
     renderFinancialSummaries();
   }
+}
+
+function visitPartsQuantity(partsCodes) {
+  const matches = String(partsCodes || '').matchAll(/[x×]\s*(\d+(?:\.\d+)?)/gi);
+  return [...matches].reduce((sum, match) => sum + (Number(match[1]) || 0), 0);
+}
+
+function customerReportRange() {
+  if (customerReportPeriod === 'custom') {
+    return { from: customerReportCustomFrom, to: customerReportCustomTo };
+  }
+  return reportDateRange(customerReportPeriod);
+}
+
+function openCustomerAuditReport(kind = activeCustomerReport || 'customers') {
+  activeCustomerReport = kind;
+  const view = $('#customerAuditView');
+  if (!view) return;
+  view.classList.remove('hidden');
+  const range = customerReportRange();
+  const inRange = (date) => date && (!range.from || date >= range.from) && (!range.to || date <= range.to);
+  const periodButton = (period, label) => `<button type="button" class="${customerReportPeriod === period ? 'active' : ''}" data-customer-period="${period}">${label}</button>`;
+  const endpoint = kind === 'visits' ? 'visit-audit' : 'customer-audit';
+  const title = kind === 'visits' ? 'جرد الزيارات' : 'جرد العملاء';
+  const description = kind === 'visits' ? 'كل الزيارات المسجلة خلال المدة المحددة.' : 'العملاء المسجلون خلال المدة المحددة مع ملخص تعاملاتهم.';
+  const query = `from=${encodeURIComponent(range.from || '')}&to=${encodeURIComponent(range.to || '')}`;
+  const periods = `<div class="financial-period-tabs customer-audit-period-tabs">${periodButton('daily', 'يومي')}${periodButton('weekly', 'أسبوعي')}${periodButton('monthly', 'شهري')}${periodButton('quarterly', 'ربع سنوي')}${periodButton('halfyear', 'نصف سنوي')}${periodButton('yearly', 'سنوي')}${periodButton('custom', 'مدة مخصصة')}</div>`;
+  const customDates = `<div class="report-date-range ${customerReportPeriod === 'custom' ? '' : 'hidden'}"><label>من <input id="customerReportFrom" type="date" value="${esc(range.from || '')}"></label><label>إلى <input id="customerReportTo" type="date" value="${esc(range.to || '')}"></label><button class="button secondary" id="customerReportApply">تطبيق المدة</button></div>`;
+  let tableHtml = '';
+  if (kind === 'customers') {
+    const rows = state.customers.filter((customer) => inRange(customer.registeredDate)).map((customer) => {
+      const visits = state.visits.filter((visit) => visit.customerCode === customer.code);
+      const serviceCounts = visits.reduce((counts, visit) => { const key = visit.serviceType || 'غير مسجل'; counts[key] = (counts[key] || 0) + 1; return counts; }, {});
+      const commonService = Object.entries(serviceCounts).sort((first, second) => second[1] - first[1])[0]?.[0] || '—';
+      return `<tr><td>${esc(customer.registeredDate || '—')}</td><td><b>${esc(customer.code || '—')}</b></td><td>${esc(customer.name || '—')}</td><td>${esc(customer.phone || '—')}</td><td>${esc(customer.carType || '—')}</td><td>${esc(customer.plate || '—')}</td><td>${fmt(visits.length)}</td><td>${esc(commonService)}</td><td>${fmt(Math.max(0, ...visits.map((visit) => Number(visit.total) || 0)))} ج</td><td>${fmt(customer.dueFromCustomer)} ج</td><td>${fmt(visits.reduce((sum, visit) => sum + (Number(visit.labor) || 0), 0))} ج</td><td>${fmt(visits.reduce((sum, visit) => sum + (Number(visit.paid) || 0), 0))} ج</td></tr>`;
+    }).join('');
+    tableHtml = `<div class="table-wrap customer-audit-table"><table><thead><tr><th>تاريخ أول تسجيل</th><th>كود العميل</th><th>اسم العميل</th><th>رقم التليفون</th><th>نوع العربية</th><th>لوحة العربية</th><th>عدد الزيارات</th><th>أكثر صيانة</th><th>أعلى فاتورة</th><th>المستحق على العميل</th><th>إجمالي المصنعيات</th><th>إجمالي المدفوع للمركز</th></tr></thead><tbody>${rows || '<tr><td colspan="12">لا يوجد عملاء في هذه الفترة.</td></tr>'}</tbody></table></div>`;
+  } else {
+    const rows = state.visits.filter((visit) => inRange(visit.date)).map((visit) => {
+      const customer = state.customers.find((item) => item.code === visit.customerCode) || {};
+      const account = state.accounts.find((item) => item.visitCode === visit.code) || {};
+      return `<tr><td><b>${esc(visit.code || '—')}</b></td><td>${esc(visit.date || '—')}</td><td>${esc(account.time || 'غير مسجل')}</td><td>${esc(customer.name || account.customerName || '—')}</td><td>${esc(visit.customerCode || '—')}</td><td>${esc(visit.technician || account.employeeName || '—')}</td><td>${esc(visit.serviceType || '—')}</td><td>${fmt(visit.mileage)}</td><td>${fmt(visitPartsQuantity(visit.partsCodes))}</td><td>${esc(visit.partsCodes || 'لا توجد قطع')}</td><td>${fmt(visit.partsTotal)} ج</td><td>${fmt(visit.labor)} ج</td><td>${fmt(visit.total)} ج</td><td>${esc(visit.paymentDetails || visit.paymentMethod || '—')}</td><td>${fmt(visit.due)} ج</td><td>${esc(visit.stockMovementCode || '—')}</td><td>${esc(account.code || '—')}</td></tr>`;
+    }).join('');
+    tableHtml = `<div class="table-wrap customer-audit-table"><table><thead><tr><th>كود الزيارة</th><th>تاريخ الزيارة</th><th>وقت الزيارة</th><th>اسم العميل</th><th>كود العميل</th><th>الموظف المسؤول</th><th>نوع الصيانة</th><th>قراءة العداد</th><th>عدد القطع</th><th>نوع وتفاصيل القطع</th><th>تكلفة قطع الغيار</th><th>تكلفة المصنعية</th><th>إجمالي الفاتورة</th><th>طريقة الدفع</th><th>المتبقي</th><th>كود حركة المخزن</th><th>كود حركة الحسابات</th></tr></thead><tbody>${rows || '<tr><td colspan="17">لا توجد زيارات في هذه الفترة.</td></tr>'}</tbody></table></div>`;
+  }
+  view.innerHTML = `<div class="statement-head"><div><h2>${title}</h2><p>${description} من ${esc(range.from || 'بداية السجل')} إلى ${esc(range.to || 'اليوم')}.</p></div><details class="download-menu"><summary>تنزيل التقرير</summary><div><a href="/api/${endpoint}?${query}&format=pdf" download>تنزيل PDF</a><a href="/api/${endpoint}?${query}&format=xlsx" download>تنزيل Excel</a></div></details></div>${periods}${customDates}${tableHtml}`;
+  view.querySelectorAll('[data-customer-period]').forEach((button) => button.addEventListener('click', () => {
+    customerReportPeriod = button.dataset.customerPeriod;
+    if (customerReportPeriod !== 'custom') openCustomerAuditReport(kind);
+    else {
+      customerReportCustomFrom = range.from || reportDateRange('daily').from;
+      customerReportCustomTo = range.to || reportDateRange('daily').to;
+      openCustomerAuditReport(kind);
+    }
+  }));
+  $('#customerReportApply')?.addEventListener('click', () => {
+    customerReportCustomFrom = $('#customerReportFrom').value;
+    customerReportCustomTo = $('#customerReportTo').value;
+    if (!customerReportCustomFrom || !customerReportCustomTo) return toast('حدد تاريخ البداية والنهاية.', true);
+    if (customerReportCustomFrom > customerReportCustomTo) return toast('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.', true);
+    openCustomerAuditReport(kind);
+  });
 }
 
 function openInventoryMovementsReportLegacy() {

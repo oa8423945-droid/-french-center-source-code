@@ -860,6 +860,148 @@ function visitInvoicePdf(visit, customer) {
   });
 }
 
+function auditDateMatch(date, from, to) {
+  const value = clean(date);
+  return value && (!from || value >= from) && (!to || value <= to);
+}
+
+function usedPartsQuantity(partsCodes) {
+  return [...clean(partsCodes).matchAll(/[x×]\s*(\d+(?:\.\d+)?)/gi)].reduce((sum, match) => sum + (Number(match[1]) || 0), 0);
+}
+
+function customerAuditRows(data, from, to) {
+  return data.customers.map((customer) => {
+    const visits = data.visits.filter((visit) => visit.customerCode === customer.code);
+    const firstVisitDate = visits.map((visit) => visit.date).filter(Boolean).sort()[0] || customer.registeredDate || '';
+    const serviceCounts = visits.reduce((counts, visit) => {
+      const service = visit.serviceType || 'غير مسجل';
+      counts[service] = (counts[service] || 0) + 1;
+      return counts;
+    }, {});
+    const commonService = Object.entries(serviceCounts).sort((first, second) => second[1] - first[1])[0]?.[0] || '—';
+    return {
+      firstVisitDate, code: customer.code || '—', name: customer.name || '—', phone: customer.phone || '—',
+      carType: customer.carType || '—', plate: customer.plate || '—', visitsCount: visits.length, commonService,
+      highestInvoice: Math.max(0, ...visits.map((visit) => Number(visit.total) || 0)),
+      dueFromCustomer: Number(customer.dueFromCustomer) || 0,
+      totalLabor: visits.reduce((sum, visit) => sum + (Number(visit.labor) || 0), 0),
+      totalPaid: visits.reduce((sum, visit) => sum + (Number(visit.paid) || 0), 0),
+    };
+  }).filter((customer) => auditDateMatch(customer.firstVisitDate, from, to));
+}
+
+function visitAuditRows(data, from, to) {
+  return data.visits.filter((visit) => auditDateMatch(visit.date, from, to)).map((visit) => {
+    const customer = data.customers.find((item) => item.code === visit.customerCode) || {};
+    const account = data.accounts.find((item) => item.visitCode === visit.code) || {};
+    return {
+      code: visit.code || '—', date: visit.date || '—', time: account.time || 'غير مسجل',
+      customerName: customer.name || account.customerName || '—', customerCode: visit.customerCode || '—',
+      technician: visit.technician || account.employeeName || '—', serviceType: visit.serviceType || '—',
+      mileage: Number(visit.mileage) || 0, partsCount: usedPartsQuantity(visit.partsCodes),
+      partsDetails: visit.partsCodes ? partsAndQuantities(visit.partsCodes, data.inventory) : 'لا توجد قطع',
+      partsTotal: Number(visit.partsTotal) || 0, labor: Number(visit.labor) || 0, total: Number(visit.total) || 0,
+      payment: visit.paymentDetails || visit.paymentMethod || '—', due: Number(visit.due) || 0,
+      stockMovementCode: visit.stockMovementCode || '—', accountCode: account.code || '—',
+    };
+  });
+}
+
+function styleAuditWorkbook(sheet, columnWidths, moneyColumns = []) {
+  sheet.views = [{ rightToLeft: true, showGridLines: false, state: 'frozen', ySplit: 3 }];
+  sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 8 };
+  sheet.getRow(1).height = 28;
+  sheet.getRow(1).font = { bold: true, size: 16, color: { argb: 'FF17243C' } };
+  sheet.getRow(3).height = 34;
+  sheet.getRow(3).eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    cell.font = { bold: true, size: 16, color: { argb: 'FF111827' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true, readingOrder: 'rtl' };
+    cell.border = { bottom: { style: 'medium', color: { argb: 'FFD4A700' } } };
+  });
+  columnWidths.forEach((width, index) => { sheet.getColumn(index + 1).width = width; });
+  for (let row = 4; row <= sheet.rowCount; row += 1) {
+    sheet.getRow(row).font = { size: 12 };
+    sheet.getRow(row).alignment = { vertical: 'middle', wrapText: true, readingOrder: 'rtl' };
+    sheet.getRow(row).height = 27;
+  }
+  moneyColumns.forEach((column) => { sheet.getColumn(column).numFmt = '#,##0.00'; });
+  sheet.autoFilter = { from: { row: 3, column: 1 }, to: { row: Math.max(3, sheet.rowCount), column: columnWidths.length } };
+}
+
+async function customerAuditWorkbook(data, from, to) {
+  const rows = customerAuditRows(data, from, to);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'المركز الفرنسي'; workbook.created = new Date();
+  const sheet = workbook.addWorksheet('جرد العملاء');
+  sheet.addRow(['تقرير جرد العملاء', `الفترة من ${from || 'بداية السجل'} إلى ${to || 'اليوم'}`]);
+  sheet.addRow([]);
+  sheet.addRow(['تاريخ أول مرة', 'كود العميل', 'اسم العميل', 'رقم تليفون العميل', 'نوع العربية', 'لوحة العربية', 'عدد الزيارات', 'أكثر صيانة', 'أعلى فاتورة', 'المستحق على العميل', 'إجمالي المصنعيات', 'إجمالي المدفوع للمركز']);
+  rows.forEach((item) => sheet.addRow([item.firstVisitDate, item.code, item.name, item.phone, item.carType, item.plate, item.visitsCount, item.commonService, item.highestInvoice, item.dueFromCustomer, item.totalLabor, item.totalPaid]));
+  styleAuditWorkbook(sheet, [16, 14, 24, 18, 20, 17, 13, 24, 16, 20, 19, 22], [9, 10, 11, 12]);
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+async function visitAuditWorkbook(data, from, to) {
+  const rows = visitAuditRows(data, from, to);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'المركز الفرنسي'; workbook.created = new Date();
+  const sheet = workbook.addWorksheet('جرد الزيارات');
+  sheet.addRow(['تقرير جرد الزيارات', `الفترة من ${from || 'بداية السجل'} إلى ${to || 'اليوم'}`]);
+  sheet.addRow([]);
+  sheet.addRow(['كود الزيارة', 'تاريخ الزيارة', 'وقت الزيارة', 'اسم العميل', 'كود العميل', 'اسم الموظف المسؤول', 'نوع الصيانة', 'قراءة العداد', 'عدد القطع', 'نوع وتفاصيل قطع الغيار', 'تكلفة قطع الغيار', 'تكلفة المصنعية', 'إجمالي الفاتورة', 'طريقة الدفع', 'المتبقي', 'كود حركة المخزن', 'كود حركة الحسابات']);
+  rows.forEach((item) => sheet.addRow([item.code, item.date, item.time, item.customerName, item.customerCode, item.technician, item.serviceType, item.mileage, item.partsCount, item.partsDetails, item.partsTotal, item.labor, item.total, item.payment, item.due, item.stockMovementCode, item.accountCode]));
+  styleAuditWorkbook(sheet, [14, 16, 14, 23, 14, 23, 22, 15, 12, 42, 18, 17, 17, 28, 15, 18, 20], [11, 12, 13, 15]);
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+function auditReportPdf(title, headers, rows, from, to, weights) {
+  return new Promise((resolve, reject) => { try {
+    const doc = new PDFDocument({ size: 'A3', layout: 'landscape', margins: { top: 34, right: 24, bottom: 34, left: 24 } });
+    const chunks = []; doc.on('data', (chunk) => chunks.push(chunk)); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject);
+    const fonts = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts');
+    const regular = ['tahoma.ttf', 'arial.ttf'].map((name) => path.join(fonts, name)).find(fs.existsSync);
+    const bold = ['tahomabd.ttf', 'arialbd.ttf'].map((name) => path.join(fonts, name)).find(fs.existsSync);
+    if (!regular || !bold) throw new Error('تعذر العثور على خط عربي مناسب.');
+    doc.registerFont('Arabic', regular); doc.registerFont('ArabicBold', bold);
+    const rtl = (value, x, y, width, options = {}) => pdfRtlText(doc, value, x, y, width, options);
+    const left = 24; const pageWidth = doc.page.width - 48; const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+    const widths = [...weights].reverse().map((weight) => pageWidth * weight / totalWeight);
+    const physicalHeaders = [...headers].reverse();
+    let y = 48;
+    const reverseDate = (value, fallback) => value ? [...String(value)].reverse().join('') : fallback;
+    const pageTitle = (continued = false) => {
+      rtl(continued ? `${title} — تابع` : title, left, y + 8, pageWidth - 8, { bold: true, size: 18, color: '#17243C' });
+      rtl(`الفترة من ${reverseDate(from, 'بداية السجل')} إلى ${reverseDate(to, 'اليوم')}`, left, y + 37, pageWidth - 8, { size: 10, color: '#667085' });
+      y += 66;
+    };
+    const tableHeader = () => { let x = left; physicalHeaders.forEach((label, index) => { doc.rect(x, y, widths[index], 34).fillAndStroke('#FFFF00', '#D4A700'); rtl(label, x + 3, y + 9, widths[index] - 6, { bold: true, size: headers.length > 14 ? 6.5 : 7.5 }); x += widths[index]; }); y += 34; };
+    const drawRow = (values) => {
+      const physicalValues = [...values].reverse();
+      const rowHeight = headers.length > 14 ? 33 : 31;
+      if (y + rowHeight > doc.page.height - 38) { doc.addPage(); y = 48; pageTitle(true); tableHeader(); }
+      let x = left;
+      physicalValues.forEach((value, index) => { doc.rect(x, y, widths[index], rowHeight).fillAndStroke('#FFFFFF', '#E5E7EB'); rtl(value ?? '—', x + 3, y + 8, widths[index] - 6, { size: headers.length > 14 ? 6.2 : 7.2 }); x += widths[index]; });
+      y += rowHeight;
+    };
+    pageTitle(); tableHeader();
+    if (rows.length) rows.forEach(drawRow); else rtl('لا توجد بيانات في الفترة المحددة.', left, y + 15, pageWidth, { size: 12 });
+    doc.end();
+  } catch (error) { reject(error); } });
+}
+
+function customerAuditPdf(data, from, to) {
+  const headers = ['تاريخ أول مرة', 'كود العميل', 'اسم العميل', 'رقم التليفون', 'نوع العربية', 'لوحة العربية', 'عدد الزيارات', 'أكثر صيانة', 'أعلى فاتورة', 'المستحق على العميل', 'إجمالي المصنعيات', 'إجمالي المدفوع'];
+  const rows = customerAuditRows(data, from, to).map((item) => [item.firstVisitDate, item.code, item.name, item.phone, item.carType, item.plate, item.visitsCount, item.commonService, item.highestInvoice, item.dueFromCustomer, item.totalLabor, item.totalPaid]);
+  return auditReportPdf('تقرير جرد العملاء', headers, rows, from, to, [1.2, 1, 1.6, 1.4, 1.3, 1.2, .9, 1.6, 1.1, 1.3, 1.3, 1.4]);
+}
+
+function visitAuditPdf(data, from, to) {
+  const headers = ['كود الزيارة', 'تاريخ الزيارة', 'وقت الزيارة', 'اسم العميل', 'كود العميل', 'الموظف المسؤول', 'نوع الصيانة', 'قراءة العداد', 'عدد القطع', 'نوع وتفاصيل القطع', 'تكلفة القطع', 'المصنعية', 'إجمالي الفاتورة', 'طريقة الدفع', 'المتبقي', 'كود حركة المخزن', 'كود حركة الحسابات'];
+  const rows = visitAuditRows(data, from, to).map((item) => [item.code, item.date, item.time, item.customerName, item.customerCode, item.technician, item.serviceType, item.mileage, item.partsCount, item.partsDetails, item.partsTotal, item.labor, item.total, item.payment, item.due, item.stockMovementCode, item.accountCode]);
+  return auditReportPdf('تقرير جرد الزيارات', headers, rows, from, to, [1, 1.1, 1, 1.4, 1, 1.4, 1.4, 1, .8, 2.6, 1.1, 1, 1.1, 1.8, 1, 1.2, 1.3]);
+}
+
 async function api(request, response, pathname, searchParams) {
   if (request.method === 'GET' && pathname === '/api/data') {
     return json(response, 200, { ...readData(), databaseFile: path.basename(DATA_FILE) });
@@ -916,6 +1058,36 @@ async function api(request, response, pathname, searchParams) {
     }
     const buffer = await dailyCloseBuffer(data, from, to, title);
     response.writeHead(200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="financial-report-${from}-${to}.xlsx"`, 'Content-Length': buffer.length });
+    return response.end(buffer);
+  }
+
+  if (request.method === 'GET' && pathname === '/api/customer-audit') {
+    const format = clean(searchParams?.get('format')) || 'xlsx';
+    const from = clean(searchParams?.get('from')) || '';
+    const to = clean(searchParams?.get('to')) || '';
+    const data = readData();
+    const buffer = format === 'pdf' ? await customerAuditPdf(data, from, to) : await customerAuditWorkbook(data, from, to);
+    response.writeHead(200, {
+      'Content-Type': format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="customer-audit-${from || 'all'}-${to || 'today'}.${format === 'pdf' ? 'pdf' : 'xlsx'}"`,
+      'Content-Length': buffer.length,
+      'Cache-Control': 'no-store',
+    });
+    return response.end(buffer);
+  }
+
+  if (request.method === 'GET' && pathname === '/api/visit-audit') {
+    const format = clean(searchParams?.get('format')) || 'xlsx';
+    const from = clean(searchParams?.get('from')) || '';
+    const to = clean(searchParams?.get('to')) || '';
+    const data = readData();
+    const buffer = format === 'pdf' ? await visitAuditPdf(data, from, to) : await visitAuditWorkbook(data, from, to);
+    response.writeHead(200, {
+      'Content-Type': format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="visit-audit-${from || 'all'}-${to || 'today'}.${format === 'pdf' ? 'pdf' : 'xlsx'}"`,
+      'Content-Length': buffer.length,
+      'Cache-Control': 'no-store',
+    });
     return response.end(buffer);
   }
 
