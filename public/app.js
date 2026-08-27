@@ -283,7 +283,6 @@ function upgradeSearchableChoices() {
     const list = document.createElement('datalist');
     list.id = 'oldProductOptions';
     productSearch.after(list);
-    $('#productSuggestions').classList.remove('hidden');
   }
   if (!$('#visitForm [name="paymentMethod"]')) {
     const laborLabel = $('#visitForm [name="labor"]').closest('label');
@@ -318,7 +317,6 @@ function resetInventoryDialog() {
   $('#newProductFields').classList.add('hidden');
   $('#oldProductFields').classList.add('hidden');
   $('#selectedOldProduct').classList.add('hidden');
-  $('#productSuggestions').innerHTML = '';
   $('#inventorySupplier').value = '';
   $('#inventorySupplierOptions').innerHTML = supplierOptions();
   calculateInventoryPurchase();
@@ -361,12 +359,14 @@ function calculateInventoryPurchase() {
 
 function renderProductSuggestions() {
   const query = normalized($('#oldProductSearch').value);
-  const matches = state.inventory.filter((item) => !query || normalized(`${item.code} ${item.name} ${item.details}`).includes(query));
+  const matches = state.inventory.map((item) => {
+    const fields = [item.code, item.name, item.details].map(normalized);
+    const exact = fields.some((field) => field === query);
+    const starts = fields.some((field) => field.startsWith(query));
+    const contains = fields.some((field) => field.includes(query));
+    return { item, score: !query ? 3 : exact ? 0 : starts ? 1 : contains ? 2 : 99 };
+  }).filter((entry) => entry.score < 99).sort((first, second) => first.score - second.score || first.item.name.localeCompare(second.item.name, 'ar')).map((entry) => entry.item);
   $('#oldProductOptions').innerHTML = matches.map((item) => `<option value="${esc(item.code)}" label="${esc(item.name)} — ${esc(item.details || 'بدون تفاصيل')} — متاح ${fmt(item.qty)}">`).join('');
-  const suggestions = $('#productSuggestions');
-  suggestions.classList.remove('hidden');
-  suggestions.innerHTML = matches.length ? matches.map((item) => `<button type="button" data-old-product-code="${esc(item.code)}"><b>${esc(item.code)}</b><span>${esc(item.name)} — ${esc(item.details || 'بدون تفاصيل')} — متاح ${fmt(item.qty)}</span></button>`).join('') : '<small>لا توجد منتجات مطابقة.</small>';
-  suggestions.querySelectorAll('[data-old-product-code]').forEach((button) => button.addEventListener('click', () => selectOldProduct(button.dataset.oldProductCode)));
   const exactItem = state.inventory.find((item) => normalized(item.code) === query);
   if (exactItem) selectOldProduct(exactItem.code);
 }
