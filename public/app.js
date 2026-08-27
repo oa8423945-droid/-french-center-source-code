@@ -1165,7 +1165,7 @@ function renderFinancialSummaries() {
   $$('#accountStatementView [data-statement-period]').forEach((button) => button.addEventListener('click', () => { statementPeriod = button.dataset.statementPeriod; renderFinancialSummaries(); }));
   $('#statementCustomApply').addEventListener('click', () => { statementCustomFrom = $('#statementCustomFrom').value; statementCustomTo = $('#statementCustomTo').value; statementPeriod = 'custom'; renderFinancialSummaries(); });
   $$('#accountStatementView .account-row').forEach((row) => row.addEventListener('click', () => showAccountDetails(row.dataset.accountCode)));
-  $$('#supplierDebtsView .supplier-debt-row').forEach((row) => row.addEventListener('click', () => { const supplier = state.suppliers.find((item) => item.code === row.dataset.supplierCode); state.selectedSupplierName = supplier?.name || ''; go('suppliers'); showSupplierDetails(row.dataset.supplierCode); }));
+  $$('#supplierDebtsView .supplier-debt-row').forEach((row) => row.addEventListener('click', () => showSupplierDetails(row.dataset.supplierCode)));
 }
 
 function openDebtDialog(mode = 'center') {
