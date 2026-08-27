@@ -933,6 +933,9 @@ function mountReportsFinancialSummary() {
   mount.appendChild(summaries);
   summaries.classList.remove('hidden');
   summaries.classList.add('reports-mounted-summary');
+  const reportTabs = $('#reportsSectionContent > .report-action-tabs');
+  const summaryContent = $('#financialSummaryContent');
+  if (reportTabs && summaryContent) summaryContent.after(reportTabs);
   const back = $('#financialSummaryBack');
   if (back && !back.dataset.reportsBack) {
     const clone = back.cloneNode(true);
@@ -980,6 +983,7 @@ function installReportsUI() {
 function renderReports(section = 'home') {
   const summaries = $('#financialSummariesView');
   if (summaries && $('#reportsContent')?.contains(summaries)) {
+    summaries.querySelector('.report-action-tabs')?.remove();
     summaries.classList.add('hidden');
     summaries.classList.remove('reports-mounted-summary');
     $('#accounts')?.appendChild(summaries);
