@@ -56,6 +56,19 @@ let statementCustomTo = '';
 let supplierDebtsVisible = false;
 let activeFinancialReport = '';
 let inventoryAuditPeriod = 'current';
+let inventoryMovementPeriod = 'daily';
+
+function inventoryMovementRange(period) {
+  const end = new Date();
+  const start = new Date(end);
+  if (period === 'weekly') start.setDate(end.getDate() - 6);
+  else if (period === 'monthly') start.setDate(1);
+  else if (period === 'quarterly') start.setMonth(Math.floor(end.getMonth() / 3) * 3, 1);
+  else if (period === 'halfyear') start.setMonth(end.getMonth() < 6 ? 0 : 6, 1);
+  else if (period === 'yearly') start.setMonth(0, 1);
+  const iso = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return { from: iso(start), to: iso(end) };
+}
 
 async function request(url, options) {
   const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -1032,11 +1045,16 @@ function renderReports(section = 'home') {
 
 function openInventoryMovementsReportLegacy() {
   // يعرض سجل الحركات داخل الصفحة بجانب خيارات التنزيل.
-  const view = $('#inventoryAuditView'); view.classList.remove('hidden'); const today = new Date().toISOString().slice(0,10); const url = (format) => `/api/inventory-movements-report?from=${today}&to=${today}&format=${format}`;
-  view.innerHTML = `<div class="statement-head"><div><h2>جرد حركة المخزن</h2><p>الصادر والوارد خلال الفترة المحددة.</p></div><details class="download-menu"><summary>تنزيل التقرير</summary><div><a class="movement-report-pdf" href="${url('pdf')}" download>تنزيل PDF</a><a class="movement-report-xlsx" href="${url('xlsx')}" download>تنزيل Excel</a></div></details></div><div class="financial-period-tabs"><button type="button" data-movement-period="daily">يومي</button><button type="button" data-movement-period="weekly">أسبوعي</button><button type="button" data-movement-period="monthly">شهري</button><button type="button" data-movement-period="quarterly">ربع سنوي</button><button type="button" data-movement-period="halfyear">نصف سنوي</button><button type="button" data-movement-period="yearly">سنوي</button><label>من <input id="movementReportFrom" type="date" value="${today}"></label><label>إلى <input id="movementReportTo" type="date" value="${today}"></label></div><div class="empty-state compact-empty">اختر الفترة ثم نزّل التقرير بصيغة PDF أو Excel.</div>`;
-  const refresh = () => { const from=$('#movementReportFrom').value, to=$('#movementReportTo').value; view.querySelector('.movement-report-pdf').href=`/api/inventory-movements-report?from=${from}&to=${to}&format=pdf`; view.querySelector('.movement-report-xlsx').href=`/api/inventory-movements-report?from=${from}&to=${to}&format=xlsx`; };
-  view.querySelectorAll('[data-movement-period]').forEach((button) => button.addEventListener('click', () => { const end=new Date(); const start=new Date(end); const p=button.dataset.movementPeriod; if(p==='weekly') start.setDate(end.getDate()-6); else if(p==='monthly') start.setDate(1); else if(p==='quarterly') start.setMonth(Math.floor(end.getMonth()/3)*3,1); else if(p==='halfyear') start.setMonth(end.getMonth()<6?0:6,1); else if(p==='yearly') start.setMonth(0,1); $('#movementReportFrom').value=start.toISOString().slice(0,10); $('#movementReportTo').value=end.toISOString().slice(0,10); refresh(); }));
-  ['movementReportFrom','movementReportTo'].forEach((id) => $(`#${id}`).addEventListener('change', refresh)); view.scrollIntoView({behavior:'smooth',block:'start'});
+  const view = $('#inventoryAuditView');
+  view.classList.remove('hidden');
+  const range = inventoryMovementRange(inventoryMovementPeriod);
+  const url = (format) => `/api/inventory-movements-report?from=${range.from}&to=${range.to}&format=${format}`;
+  const periodButton = (period, label) => `<button class="${inventoryMovementPeriod === period ? 'active' : ''}" type="button" data-movement-period="${period}">${label}</button>`;
+  view.innerHTML = `<div class="statement-head"><div><h2>جرد حركة المخزن</h2><p>الصادر والوارد من ${range.from} إلى ${range.to}.</p></div><details class="download-menu"><summary>تنزيل التقرير</summary><div><a class="movement-report-pdf" href="${url('pdf')}" download>تنزيل PDF</a><a class="movement-report-xlsx" href="${url('xlsx')}" download>تنزيل Excel</a></div></details></div><div class="financial-period-tabs report-period-shell">${periodButton('daily', 'يومي')}${periodButton('weekly', 'أسبوعي')}${periodButton('monthly', 'شهري')}${periodButton('quarterly', 'ربع سنوي')}${periodButton('halfyear', 'نصف سنوي')}${periodButton('yearly', 'سنوي')}<label class="hidden">من <input id="movementReportFrom" type="date" value="${range.from}"></label><label class="hidden">إلى <input id="movementReportTo" type="date" value="${range.to}"></label></div><div class="empty-state compact-empty">لا توجد حركات في هذه الفترة.</div>`;
+  view.querySelectorAll('[data-movement-period]').forEach((button) => button.addEventListener('click', () => {
+    inventoryMovementPeriod = button.dataset.movementPeriod;
+    openInventoryMovementsReport();
+  }));
 }
 
 function openInventoryMovementsReport() {
