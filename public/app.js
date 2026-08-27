@@ -277,12 +277,10 @@ function upgradeSearchableChoices() {
     input.after(list);
   }
   const productSearch = $('#oldProductSearch');
-  if (productSearch && !$('#oldProductOptions')) {
-    productSearch.setAttribute('list', 'oldProductOptions');
+  if (productSearch) {
+    productSearch.removeAttribute('list');
     productSearch.placeholder = 'اضغط للاختيار أو اكتب كود أو اسم المنتج';
-    const list = document.createElement('datalist');
-    list.id = 'oldProductOptions';
-    productSearch.after(list);
+    $('#oldProductOptions')?.remove();
   }
   if (!$('#visitForm [name="paymentMethod"]')) {
     const laborLabel = $('#visitForm [name="labor"]').closest('label');
@@ -317,6 +315,7 @@ function resetInventoryDialog() {
   $('#newProductFields').classList.add('hidden');
   $('#oldProductFields').classList.add('hidden');
   $('#selectedOldProduct').classList.add('hidden');
+  $('#oldProductDropdown')?.classList.add('hidden');
   $('#inventorySupplier').value = '';
   $('#inventorySupplierOptions').innerHTML = supplierOptions();
   calculateInventoryPurchase();
@@ -359,6 +358,8 @@ function calculateInventoryPurchase() {
 
 function renderProductSuggestions() {
   const query = normalized($('#oldProductSearch').value);
+  const dropdown = $('#oldProductDropdown');
+  if (!query) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; return; }
   const matches = state.inventory.map((item) => {
     const fields = [item.code, item.name, item.details].map(normalized);
     const exact = fields.some((field) => field === query);
@@ -366,7 +367,9 @@ function renderProductSuggestions() {
     const contains = fields.some((field) => field.includes(query));
     return { item, score: !query ? 3 : exact ? 0 : starts ? 1 : contains ? 2 : 99 };
   }).filter((entry) => entry.score < 99).sort((first, second) => first.score - second.score || first.item.name.localeCompare(second.item.name, 'ar')).map((entry) => entry.item);
-  $('#oldProductOptions').innerHTML = matches.map((item) => `<option value="${esc(item.code)}" label="${esc(item.name)} — ${esc(item.details || 'بدون تفاصيل')} — متاح ${fmt(item.qty)}">`).join('');
+  dropdown.classList.remove('hidden');
+  dropdown.innerHTML = matches.length ? matches.slice(0, 8).map((item) => `<button type="button" data-old-product-code="${esc(item.code)}"><b>${esc(item.code)}</b><span>${esc(item.name)} — ${esc(item.details || 'بدون تفاصيل')}</span><small>متاح ${fmt(item.qty)}</small></button>`).join('') : '<div class="old-product-no-result">لا توجد منتجات مطابقة.</div>';
+  dropdown.querySelectorAll('[data-old-product-code]').forEach((button) => button.addEventListener('click', () => selectOldProduct(button.dataset.oldProductCode)));
   const exactItem = state.inventory.find((item) => normalized(item.code) === query);
   if (exactItem) selectOldProduct(exactItem.code);
 }
@@ -380,6 +383,7 @@ function selectOldProduct(code) {
   setMoneyInputValue(form.elements.sell, item.sell);
   form.elements.supplier.value = item.supplier || '';
   $('#oldProductSearch').value = item.code;
+  $('#oldProductDropdown')?.classList.add('hidden');
   const selected = $('#selectedOldProduct');
   selected.classList.remove('hidden');
   selected.innerHTML = `<b>${esc(item.name)}</b><span>${esc(item.details || 'بدون تفاصيل')} · ${esc(item.country || 'بلد المنشأ غير مسجل')} · الكمية الحالية ${fmt(item.qty)}</span>`;
@@ -1510,6 +1514,9 @@ $('#inventoryModeBack').addEventListener('click', resetInventoryDialog);
 $('#oldProductSearch').addEventListener('input', renderProductSuggestions);
 $('#oldProductSearch').addEventListener('focus', renderProductSuggestions);
 $('#oldProductSearch').addEventListener('click', renderProductSuggestions);
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('#oldProductFields')) $('#oldProductDropdown')?.classList.add('hidden');
+});
 ['qty','buy','sell','paid'].forEach((name) => $('#inventoryForm').elements[name].addEventListener('input', calculateInventoryPurchase));
 const scrollToLowStock = () => $('#lowStockPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
 $('#lowStockSummary').addEventListener('click', scrollToLowStock);
