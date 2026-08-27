@@ -260,7 +260,6 @@ function supplierOptions(selected = '') {
 }
 
 function upgradeSearchableChoices() {
-  $('#searchCode').placeholder = 'مثال: C1';
   $('#directoryCustomerCode').placeholder = 'مثال: C1';
   $('#directoryVisitCode').placeholder = 'مثال: V1';
   const technician = $('#visitForm [name="technician"]');
@@ -537,6 +536,7 @@ function resetCustomerView() {
   $('#oldCustomerView').classList.add('hidden');
   $('#customerResult').classList.add('hidden');
   $('#searchMessage').classList.remove('hidden');
+  $('#oldCustomerSuggestions')?.classList.add('hidden');
   state.selectedCustomer = null;
 }
 
@@ -545,17 +545,52 @@ function showMode(mode) {
   $(`#${mode === 'new' ? 'newCustomerView' : 'oldCustomerView'}`).classList.remove('hidden');
 }
 
+function oldCustomerSearchMatches(value) {
+  const text = normalized(value);
+  const key = codeKey(value);
+  if (!text) return [];
+  return state.customers.map((customer) => {
+    const fields = [customer.name, customer.phone, customer.plate].map(normalized);
+    const customerCode = codeKey(customer.code);
+    const exact = customerCode === key || fields.some((field) => field === text);
+    const starts = customerCode.startsWith(key) || fields.some((field) => field.startsWith(text));
+    const contains = customerCode.includes(key) || fields.some((field) => field.includes(text));
+    return { customer, score: exact ? 0 : starts ? 1 : contains ? 2 : 99 };
+  }).filter((item) => item.score < 99).sort((first, second) => first.score - second.score || first.customer.name.localeCompare(second.customer.name, 'ar')).map((item) => item.customer);
+}
+
+function renderOldCustomerSuggestions() {
+  const input = $('#oldCustomerSmartSearch');
+  const results = $('#oldCustomerSuggestions');
+  if (!input || !results) return;
+  const matches = oldCustomerSearchMatches(input.value).slice(0, 8);
+  if (!input.value.trim()) { results.classList.add('hidden'); results.innerHTML = ''; return; }
+  results.classList.remove('hidden');
+  results.innerHTML = matches.length ? matches.map((customer) => `<button type="button" class="old-customer-suggestion" data-customer-code="${esc(customer.code)}"><b>${esc(customer.name)}</b><span>${esc(customer.code)}</span><small>الهاتف: ${esc(customer.phone || '—')} · اللوحة: ${esc(customer.plate || '—')} · العربية: ${esc(customer.carType || '—')}</small><i>فتح ←</i></button>`).join('') : '<div class="global-code-no-result">لا يوجد عميل مطابق للبحث.</div>';
+  $$('#oldCustomerSuggestions [data-customer-code]').forEach((button) => button.addEventListener('click', () => {
+    const customer = state.customers.find((item) => codeKey(item.code) === codeKey(button.dataset.customerCode));
+    if (!customer) return;
+    input.value = customer.code;
+    results.classList.add('hidden');
+    showSearchedCustomer(customer);
+  }));
+}
+
 function searchCustomer() {
-  const code = $('#searchCode').value.trim().toLocaleLowerCase();
-  const plate = normalized($('#searchPlate').value);
-  if (!code && !plate) return toast('اكتب كود العميل أو لوحة العربية أولًا.', true);
-  const customer = state.customers.find((item) => (code && item.code.toLocaleLowerCase() === code) || (plate && normalized(item.plate) === plate));
+  const query = $('#oldCustomerSmartSearch')?.value.trim() || '';
+  if (!query) return toast('اكتب الاسم أو رقم الهاتف أو كود العميل أو لوحة العربية أولًا.', true);
+  const customer = oldCustomerSearchMatches(query)[0];
   if (!customer) {
     $('#customerResult').classList.add('hidden');
     $('#searchMessage').classList.remove('hidden');
     $('#searchMessage').textContent = 'لم يتم العثور على عميل بهذه البيانات.';
     return;
   }
+  $('#oldCustomerSuggestions')?.classList.add('hidden');
+  showSearchedCustomer(customer);
+}
+
+function showSearchedCustomer(customer) {
   state.selectedCustomer = customer;
   const visits = state.visits.filter((visit) => visit.customerCode === customer.code || normalized(visit.plate) === normalized(customer.plate));
   $('#searchMessage').classList.add('hidden');
@@ -1476,8 +1511,9 @@ $('#lowStockSummary').addEventListener('click', scrollToLowStock);
 $('#lowStockSummary').addEventListener('keydown', (event) => {
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); scrollToLowStock(); }
 });
-$('#searchCode').addEventListener('keydown', (event) => event.key === 'Enter' && searchCustomer());
-$('#searchPlate').addEventListener('keydown', (event) => event.key === 'Enter' && searchCustomer());
+$('#oldCustomerSmartSearch').addEventListener('input', renderOldCustomerSuggestions);
+$('#oldCustomerSmartSearch').addEventListener('focus', renderOldCustomerSuggestions);
+$('#oldCustomerSmartSearch').addEventListener('keydown', (event) => event.key === 'Enter' && searchCustomer());
 
 $('#customerForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -1492,8 +1528,7 @@ $('#customerForm').addEventListener('submit', async (event) => {
     toast(`تم حفظ العميل في main data 2.xlsx — الكود ${customer.code}`);
     $('#newCustomerView').classList.add('hidden');
     $('#oldCustomerView').classList.remove('hidden');
-    $('#searchCode').value = customer.code;
-    $('#searchPlate').value = '';
+    $('#oldCustomerSmartSearch').value = customer.code;
     searchCustomer();
     openVisitDialog();
   } catch (error) { toast(error.message, true); }

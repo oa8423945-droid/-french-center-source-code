@@ -70,8 +70,8 @@
         </div>
 
         <div id="oldCustomerView" class="subview hidden">
-          <div class="section-bar"><button class="back-btn">→ رجوع</button><div><h2>البحث عن عميل قديم</h2><p>يكفي كتابة كود العميل أو لوحة العربية.</p></div></div>
-          <div class="panel search-box"><div><label>كود العميل<input id="searchCode" placeholder="مثال: C1"></label><span>أو</span><label>لوحة العربية<input id="searchPlate" placeholder="مثال: أ ب ج 1234"></label></div><button id="searchBtn" class="primary">بحث</button></div>
+          <div class="section-bar"><button class="back-btn">→ رجوع</button><div><h2>البحث عن عميل قديم</h2><p>ابحث بالاسم أو رقم الهاتف أو كود العميل أو لوحة العربية.</p></div></div>
+          <div class="panel old-customer-smart-search"><div class="old-customer-search-row"><label>بحث سريع عن العميل<input id="oldCustomerSmartSearch" autocomplete="off" placeholder="اكتب الاسم أو الهاتف أو الكود أو لوحة العربية"></label><button id="searchBtn" class="primary" type="button">بحث</button></div><div id="oldCustomerSuggestions" class="old-customer-suggestions hidden"></div></div>
           <div id="searchMessage" class="empty-state">ابدأ البحث لعرض بيانات العميل وزياراته السابقة.</div>
           <div id="customerResult" class="hidden"></div>
         </div>
