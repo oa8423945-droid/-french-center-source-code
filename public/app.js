@@ -961,7 +961,7 @@ function openFinancialReport(report) {
   activeFinancialReport = shouldClose ? '' : report;
   $('#inventoryAuditView')?.classList.add('hidden');
   if (report === 'statement') statementPeriod = 'daily';
-  $$('#reportsContent [data-report]').forEach((button) => button.classList.toggle('active', button.dataset.report === report));
+  $$('#reportsContent [data-report]').forEach((button) => button.classList.toggle('active', button.dataset.report === activeFinancialReport));
   renderFinancialSummaries();
 }
 
