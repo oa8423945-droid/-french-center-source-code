@@ -54,6 +54,7 @@ let statementPeriod = 'daily';
 let statementCustomFrom = '';
 let statementCustomTo = '';
 let supplierDebtsVisible = false;
+let activeFinancialReport = '';
 
 async function request(url, options) {
   const response = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...options });
@@ -946,9 +947,17 @@ function openFinancialReport(report) {
   if (!$('main #reports')?.classList.contains('active')) go('reports');
   if (!$('#reportsFinancialMount')) renderReports('accounts');
   mountReportsFinancialSummary();
-  dailyClosingVisible = report === 'daily';
-  supplierDebtsVisible = report === 'supplierDebts';
-  $('#accountStatementView').classList.toggle('hidden', report !== 'statement');
+  const closing = report === 'daily';
+  const supplier = report === 'supplierDebts';
+  const statement = report === 'statement';
+  const isClosing = closing && dailyClosingVisible;
+  const isSupplier = supplier && supplierDebtsVisible;
+  const isStatement = statement && !$('#accountStatementView').classList.contains('hidden');
+  const shouldClose = (isClosing || isSupplier || isStatement) && activeFinancialReport === report;
+  dailyClosingVisible = closing && !shouldClose;
+  supplierDebtsVisible = supplier && !shouldClose;
+  $('#accountStatementView').classList.toggle('hidden', !statement || shouldClose);
+  activeFinancialReport = shouldClose ? '' : report;
   $('#inventoryAuditView')?.classList.add('hidden');
   if (report === 'statement') statementPeriod = 'daily';
   $$('#reportsContent [data-report]').forEach((button) => button.classList.toggle('active', button.dataset.report === report));
@@ -978,24 +987,37 @@ function renderReports(section = 'home') {
   const sectionCards = `<div class="reports-grid report-main-grid"><button class="report-card report-section-card" type="button" data-report-section="accounts"><span>ج</span><b>قسم الحسابات</b><small>قفل اليومية، كشف الحساب، ديون الموردين، والديون الخارجية للمركز.</small></button><button class="report-card report-section-card" type="button" data-report-section="customers"><span>ع</span><b>بيانات العملاء</b><small>تقارير وسجلات العملاء هتتضاف هنا حسب المطلوب القادم.</small></button><button class="report-card report-section-card" type="button" data-report-section="inventory"><span>▦</span><b>المخزن</b><small>جرد المخزن الحالي وجرد حركة الصادر والوارد.</small></button><button class="report-card report-section-card" type="button" data-report-section="employees"><span>♟</span><b>الموظفين</b><small>تقارير الموظفين والمرتبات والسلف هتتضاف هنا.</small></button></div>`;
   const sectionViews = {
     home: sectionCards,
-    accounts: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">التقارير المالية</span><h2>قسم الحسابات</h2><p>اختار التقرير المطلوب وسيظهر هنا داخل قسم التقارير.</p></div></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div><div id="reportsFinancialMount"></div>`,
+    accounts: `<div class="reports-subpage-head reports-financial-head"><div><span class="eyebrow">التقارير</span><h2>التقارير المالية</h2><p>اختار التقرير المطلوب لعرض بياناته.</p></div><button class="back-btn" type="button" data-report-section="home">→ رجوع</button></div><div class="report-action-tabs"><button type="button" data-report="daily">قفل اليومية</button><button type="button" data-report="statement">كشف الحساب</button><button type="button" data-report="supplierDebts">ديون للموردين</button><button type="button" data-report="externalDebts">الديون الخارجية للمركز</button></div><div id="reportsFinancialMount"></div>`,
     customers: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير العملاء</span><h2>بيانات العملاء</h2><p>هنا هنضيف تقارير العملاء لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
     inventory: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير المخزن</span><h2>المخزن</h2><p>اختار الجرد المطلوب وسيظهر داخل التقارير.</p></div></div><div class="report-action-tabs"><button type="button" data-report="inventory">جرد المخزن</button><button type="button" data-report="inventoryMovements">جرد حركة المخزن</button></div>`,
     employees: `<div class="reports-subpage-head"><button class="back-btn" type="button" data-report-section="home">→ رجوع للتقارير</button><div><span class="eyebrow">تقارير الموظفين</span><h2>الموظفين</h2><p>هنا هنضيف تقارير الموظفين لما تحدد المطلوب.</p></div></div><div class="empty-state compact-empty">لا توجد تقارير مفعلة في هذا القسم حالياً.</div>`,
   };
   $('#reportsContent').innerHTML = `<div id="reportsSectionContent">${sectionViews[section] || sectionCards}</div><div id="inventoryAuditView" class="financial-report-section hidden"></div>`;
+  $('#reports .page-title')?.classList.toggle('hidden', section !== 'home');
   $$('#reportsContent [data-report-section]').forEach((button) => button.addEventListener('click', () => renderReports(button.dataset.reportSection)));
   $$('#reportsContent [data-report]').forEach((button) => button.addEventListener('click', () => {
     $$('#reportsContent [data-report]').forEach((item) => item.classList.toggle('active', item === button));
     if (button.dataset.report === 'inventory') return openInventoryAuditReport();
     if (button.dataset.report === 'inventoryMovements') return openInventoryMovementsReport();
-    if (button.dataset.report === 'externalDebts') return openExternalDebtsReport();
+    if (button.dataset.report === 'externalDebts') {
+      const view = $('#inventoryAuditView');
+      if (activeFinancialReport === 'externalDebts' && view && !view.classList.contains('hidden')) {
+        view.classList.add('hidden');
+        activeFinancialReport = '';
+        button.classList.remove('active');
+      } else {
+        activeFinancialReport = 'externalDebts';
+        openExternalDebtsReport();
+      }
+      return;
+    }
     openFinancialReport(button.dataset.report);
   }));
   if (section === 'accounts') {
     mountReportsFinancialSummary();
     dailyClosingVisible = false;
     supplierDebtsVisible = false;
+    activeFinancialReport = '';
     $('#accountStatementView')?.classList.add('hidden');
     renderFinancialSummaries();
   }
