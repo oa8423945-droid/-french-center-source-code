@@ -249,7 +249,7 @@ function upgradeSearchableChoices() {
     $('.inventory-common-fields').insertAdjacentHTML('beforeend', `<label>طريقة الدفع<select name="paymentMethod" required>${paymentMethodOptions(false)}</select></label>`);
   }
   if (!$('#supplierTransactionForm [name="paymentMethod"]')) {
-    $('#supplierTransactionForm .transaction-notes').insertAdjacentHTML('beforebegin', `<label class="transaction-notes">طريقة الدفع<select name="paymentMethod" required>${paymentMethodOptions(false)}</select></label>`);
+    $('#supplierTransactionForm .transaction-notes').insertAdjacentHTML('beforebegin', `<label class="transaction-notes">طريقة الدفع<select name="paymentMethod" required>${paymentMethodOptions(false)}</select></label><div id="supplierDueHint" class="supplier-due-hint">اختر المورد لعرض المبلغ المستحق.</div>`);
   }
   installSplitPayment($('#visitForm'), 'paid');
   installSplitPayment($('#inventoryForm'), 'paid', false);
@@ -653,8 +653,8 @@ function installSuppliersUI() {
   const transactionDialog = document.createElement('dialog');
   transactionDialog.id = 'supplierTransactionDialog';
   transactionDialog.innerHTML = `<form id="supplierTransactionForm"><button type="button" class="dialog-close">×</button><div class="dialog-title"><span>↔</span><div><h2>تسجيل حركة مورد</h2><p>سداد مستحقات أو توريد بضاعة.</p></div></div>
-    <div class="form-grid"><label>اختر المورد (اختياري في التوريد)<input name="supplierCode" id="transactionSupplier" list="transactionSupplierOptions" placeholder="اكتب كود أو اسم المورد"><datalist id="transactionSupplierOptions"></datalist></label><label>نوع الحركة<select name="type" id="supplierTransactionType"><option value="">اختر نوع الحركة</option><option value="سداد مستحقات">سداد مستحقات</option><option value="توريد بضاعة">توريد بضاعة</option></select></label></div>
-    <div id="paymentTransactionFields" class="form-grid hidden"><div id="supplierDueHint" class="supplier-due-hint wide">اختر المورد لعرض المبلغ المستحق.</div><label>مبلغ السداد<input name="amount" type="number" min="0.01" step="0.01"></label></div>
+    <div class="form-grid"><label>نوع الحركة<select name="type" id="supplierTransactionType"><option value="">اختر نوع الحركة</option><option value="سداد مستحقات">سداد مستحقات</option><option value="توريد بضاعة">توريد بضاعة</option></select></label><label>اختر المورد (اختياري في التوريد)<input name="supplierCode" id="transactionSupplier" list="transactionSupplierOptions" placeholder="اكتب كود أو اسم المورد"><datalist id="transactionSupplierOptions"></datalist></label></div>
+    <div id="paymentTransactionFields" class="form-grid hidden"><label class="wide">مبلغ السداد<input name="amount" type="number" min="0.01" step="0.01"></label></div>
     <div id="supplyTransactionFields" class="form-grid hidden"><label class="wide">المنتج<input name="productCode" id="transactionProduct" list="transactionProductOptions" placeholder="اكتب كود أو اسم المنتج"><datalist id="transactionProductOptions"></datalist></label><label>الكمية<input name="qty" type="number" min="1"></label><label>سعر الشراء<input name="buy" type="number" min="0" step="0.01"></label><label>سعر البيع<input name="sell" type="number" min="0" step="0.01"></label><label>المبلغ المدفوع<input name="paid" type="number" min="0" step="0.01" value="0"></label><label>المبلغ المستحق<input id="transactionDue" readonly value="0"></label></div>
     <label class="transaction-notes">ملاحظات<textarea name="notes" rows="2"></textarea></label><div class="form-actions"><button class="primary" type="submit">حفظ الحركة</button></div></form>`;
   document.body.appendChild(transactionDialog);
@@ -728,6 +728,7 @@ function updateSupplierTransactionFields() {
   const type = $('#supplierTransactionType').value;
   $('#paymentTransactionFields').classList.toggle('hidden', type !== 'سداد مستحقات');
   $('#supplyTransactionFields').classList.toggle('hidden', type !== 'توريد بضاعة');
+  $('#supplierDueHint')?.classList.toggle('hidden', type !== 'سداد مستحقات');
   updateSupplierDueHint();
 }
 
