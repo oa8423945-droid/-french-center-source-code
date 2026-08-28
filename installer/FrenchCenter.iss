@@ -1,7 +1,7 @@
 #define MyAppName "المركز الفرنسي"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "المركز الفرنسي"
-#define MyAppExeName "start-system.vbs"
+#define MyAppExeName "تشغيل النظام.bat"
 
 [Setup]
 AppId={{C61BBC39-97A4-469D-B43B-30C97004C074}
@@ -27,9 +27,9 @@ Source: "stage\*"; DestDir: "{app}"; Excludes: "data\main data 2.xlsx"; Flags: i
 Source: "stage\data\main data 2.xlsx"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; WorkingDir: "{app}"
-Name: "{group}\{#MyAppName}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; WorkingDir: "{app}"
-Name: "{group}\فتح ملف البيانات"; Filename: "{app}\open-data.bat"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\فتح ملف البيانات"; Filename: "{app}\فتح ملف البيانات.bat"; WorkingDir: "{app}"
 
 [Run]
-Filename: "{sys}\wscript.exe"; Parameters: """{app}\{#MyAppExeName}"""; Description: "تشغيل المركز الفرنسي"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "تشغيل المركز الفرنسي"; Flags: nowait postinstall skipifsilent

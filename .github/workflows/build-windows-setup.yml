@@ -42,7 +42,7 @@ jobs:
         run: |
           $stage = "installer\stage"
           New-Item -ItemType Directory -Force "$stage\runtime", "$stage\data" | Out-Null
-          $rootFiles = @("server.js", "package.json", "package-lock.json", "README.md", "start-system.bat", "start-system.vbs", "open-data.bat")
+          $rootFiles = @("server.js", "package.json", "package-lock.json", "README.md", "تشغيل النظام.bat", "فتح ملف البيانات.bat")
           foreach ($file in $rootFiles) {
             Copy-Item -LiteralPath $file -Destination $stage
           }
