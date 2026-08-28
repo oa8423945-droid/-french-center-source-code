@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FrenchCenter-Windows-Setup
-          path: installer/output/FrenchCenter-Setup.exe
+          path: installer/output/FrenchCenter-Setup-1.0.1.exe
 
       - name: Publish latest Windows installer
         env:
@@ -71,7 +71,7 @@ jobs:
         shell: bash
         run: |
           if gh release view windows-latest >/dev/null 2>&1; then
-            gh release upload windows-latest "installer/output/FrenchCenter-Setup.exe" --clobber
+            gh release upload windows-latest "installer/output/FrenchCenter-Setup-1.0.1.exe" --clobber
           else
-            gh release create windows-latest "installer/output/FrenchCenter-Setup.exe" --title "French Center - Windows Setup" --notes "Complete installer for Windows 10 and Windows 11."
+            gh release create windows-latest "installer/output/FrenchCenter-Setup-1.0.1.exe" --title "French Center - Windows Setup" --notes "Complete installer for Windows 10 and Windows 11."
           fi

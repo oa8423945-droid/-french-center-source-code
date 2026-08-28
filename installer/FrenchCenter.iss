@@ -1,5 +1,5 @@
 #define MyAppName "المركز الفرنسي"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "المركز الفرنسي"
 #define MyAppExeName "تشغيل النظام.bat"
 
@@ -15,7 +15,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=output
-OutputBaseFilename=FrenchCenter-Setup
+OutputBaseFilename=FrenchCenter-Setup-1.0.1
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
