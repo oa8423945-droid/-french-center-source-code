@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تسجيل الدخول | المركز الفرنسي</title>
+  <link rel="stylesheet" href="/login.css">
+  <style>.login-loading{position:fixed;inset:0;z-index:100;background:linear-gradient(145deg,#f7faff,#edf4ff);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#17243c}.is-authenticating .login-loading{display:flex}.is-authenticating .login-page{visibility:hidden}.login-loading-logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#3488ff,#175fca);display:grid;place-items:center;color:#fff;font-size:30px;font-weight:900;box-shadow:0 12px 30px rgba(38,118,238,.28)}.login-spinner{width:42px;height:42px;border:4px solid #cfe0fa;border-top-color:#2676ee;border-radius:50%;animation:login-spin .75s linear infinite}.login-loading b{font-size:14px}@keyframes login-spin{to{transform:rotate(360deg)}}</style>
+</head>
+<body>
+  <div id="loginLoading" class="login-loading" role="status"><span class="login-loading-logo">F</span><span class="login-spinner"></span><b>جاري تسجيل الدخول وتحميل صلاحياتك...</b></div>
+  <main class="login-page">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="brand-mark" aria-hidden="true">F</div>
+      <p class="eyebrow">نظام إدارة مركز الصيانة</p>
+      <h1 id="loginTitle">تسجيل الدخول</h1>
+      <p class="intro">أدخل بيانات المستخدم المسجلة لفتح نظام المركز الفرنسي.</p>
+
+      <form id="loginForm" novalidate>
+        <label>
+          <span>اسم المستخدم</span>
+          <input id="username" name="username" type="text" autocomplete="username" required autofocus placeholder="اكتب اسم المستخدم">
+        </label>
+        <label>
+          <span>كلمة المرور</span>
+          <div class="password-field">
+            <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="اكتب كلمة المرور">
+            <button id="togglePassword" type="button" aria-label="إظهار كلمة المرور">إظهار</button>
+          </div>
+        </label>
+        <p id="loginError" class="error-message" role="alert" aria-live="polite"></p>
+        <button id="loginButton" class="login-button" type="submit">دخول إلى النظام</button>
+      </form>
+      <small class="footer-note">المركز الفرنسي لصيانة السيارات</small>
+    </section>
+  </main>
+  <script src="/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+garage-server.pid
+*.log
+*-test.xlsx
+sources/
+.agents/
+.codex/
+AGENTS.md
+data/Book1.xlsx
+.npm-cache/
+installer/stage/
+installer/output/
+tmp/
+output/
