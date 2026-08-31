@@ -23,8 +23,9 @@ UninstallDisplayName={#MyAppName}
 SetupLogging=yes
 
 [Files]
-Source: "stage\*"; DestDir: "{app}"; Excludes: "data\main data 2.xlsx"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "stage\*"; DestDir: "{app}"; Excludes: "data\main data 2.xlsx,data\usre.xlsx"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "stage\data\main data 2.xlsx"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "stage\data\usre.xlsx"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
